@@ -14,6 +14,13 @@ import com.example.appsenkaspi.databinding.FragmentTrabalhosBinding
 import com.example.appsenkaspi.ui.atividade.TelaAtividadeFragment
 import com.example.appsenkaspi.viewmodel.AtividadeViewModel
 
+/**
+ * Fragmento responsável por exibir a aba "Meus Trabalhos" no perfil do usuário.
+ *
+ * Mostra uma lista de atividades em que o funcionário está envolvido. As atividades são obtidas
+ * via ViewModel e associadas ao ID salvo em `SharedPreferences`. Caso não existam atividades,
+ * um estado vazio (EmptyState) é exibido.
+ */
 class TrabalhosFragment : Fragment() {
 
   private var _binding: FragmentTrabalhosBinding? = null
@@ -24,13 +31,21 @@ class TrabalhosFragment : Fragment() {
   private lateinit var adapter: AtividadePerfilAdapter
 
   override fun onCreateView(
-      inflater: LayoutInflater, container: ViewGroup?,
-      savedInstanceState: Bundle?
+    inflater: LayoutInflater,
+    container: ViewGroup?,
+    savedInstanceState: Bundle?
   ): View {
     _binding = FragmentTrabalhosBinding.inflate(inflater, container, false)
     return binding.root
   }
 
+  /**
+   * Inicializa a visualização com a lista de atividades do funcionário logado.
+   *
+   * - Recupera o ID do funcionário via SharedPreferences.
+   * - Observa as atividades do ViewModel.
+   * - Atualiza a RecyclerView com a lista ou exibe uma view de estado vazio.
+   */
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)
 
@@ -58,6 +73,11 @@ class TrabalhosFragment : Fragment() {
       }
   }
 
+  /**
+   * Configura o RecyclerView com o adapter de atividades e define o comportamento ao clicar em uma atividade.
+   *
+   * Ao clicar, navega para [TelaAtividadeFragment] passando o ID da atividade via `arguments`.
+   */
   private fun configurarRecycler() {
     adapter = AtividadePerfilAdapter { atividadeComFuncionarios ->
       val fragment = TelaAtividadeFragment().apply {
@@ -71,7 +91,7 @@ class TrabalhosFragment : Fragment() {
         .commit()
     }
 
-      binding.recyclerAtividades.layoutManager = LinearLayoutManager(requireContext())
+    binding.recyclerAtividades.layoutManager = LinearLayoutManager(requireContext())
     binding.recyclerAtividades.adapter = adapter
   }
 

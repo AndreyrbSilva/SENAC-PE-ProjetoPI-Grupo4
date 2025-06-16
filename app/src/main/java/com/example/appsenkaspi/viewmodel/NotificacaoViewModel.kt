@@ -26,18 +26,31 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Date
 
+/**
+ * ViewModel responsável pelo gerenciamento das requisições e notificações internas no app.
+ *
+ * Esta classe processa requisições de criação, edição e conclusão de ações e atividades,
+ * atualiza notificações, envia alertas para os usuários, e mantém contadores e estados reativos
+ * para interface do coordenador e dos membros de apoio.
+ */
 class NotificacaoViewModel(application: Application) : AndroidViewModel(application) {
 
-  private val db = AppDatabase.Companion.getDatabase(application)
+  private val db = AppDatabase.getDatabase(application)
   private val requisicaoDao = db.requisicaoDao()
   private val atividadeDao = db.atividadeDao()
   private val acaoDao = db.acaoDao()
   private val acaoFuncionarioDao = db.acaoFuncionarioDao()
   private val atividadeFuncionarioDao = db.atividadeFuncionarioDao()
 
+  /**
+   * Retorna todas as requisições pendentes aguardando decisão do coordenador.
+   */
   fun getRequisicoesPendentes(): LiveData<List<RequisicaoEntity>> =
     requisicaoDao.getRequisicoesPendentes()
 
+  /**
+   * Busca uma requisição específica por ID (modo LiveData).
+   */
   fun getRequisicaoPorId(id: Int): LiveData<RequisicaoEntity> {
     val result = MutableLiveData<RequisicaoEntity>()
     viewModelScope.launch {
@@ -46,6 +59,12 @@ class NotificacaoViewModel(application: Application) : AndroidViewModel(applicat
     return result
   }
 
+  /**
+   * Processa a decisão do coordenador (aceitar ou recusar) para uma requisição.
+   *
+   * Executa ações correspondentes como salvar entidade no banco, atualizar status
+   * e emitir notificações visuais.
+   */
   fun responderRequisicao(context: Context, requisicao: RequisicaoEntity, aceitar: Boolean) {
     viewModelScope.launch {
       val status = if (aceitar) StatusRequisicao.ACEITA else StatusRequisicao.RECUSADA
@@ -56,6 +75,7 @@ class NotificacaoViewModel(application: Application) : AndroidViewModel(applicat
         mensagemResposta = if (aceitar) "Requisição aceita." else "Requisição recusada."
       )
       requisicaoDao.update(novaRequisicao)
+
       val tipoDescricao = when (requisicao.tipo) {
         TipoRequisicao.CRIAR_ATIVIDADE -> "criação de atividade"
         TipoRequisicao.EDITAR_ATIVIDADE -> "edição de atividade"
@@ -72,23 +92,11 @@ class NotificacaoViewModel(application: Application) : AndroidViewModel(applicat
         requisicao.id * 100
       )
 
-
-
       if (!aceitar) return@launch
 
       when (requisicao.tipo) {
-        TipoRequisicao.CRIAR_ATIVIDADE -> salvarAtividade(
-          context,
-          requisicao.atividadeJson!!,
-          isEdicao = false
-        )
-
-        TipoRequisicao.EDITAR_ATIVIDADE -> salvarAtividade(
-          context,
-          requisicao.atividadeJson!!,
-          isEdicao = true
-        )
-
+        TipoRequisicao.CRIAR_ATIVIDADE -> salvarAtividade(context, requisicao.atividadeJson!!, isEdicao = false)
+        TipoRequisicao.EDITAR_ATIVIDADE -> salvarAtividade(context, requisicao.atividadeJson!!, isEdicao = true)
         TipoRequisicao.COMPLETAR_ATIVIDADE -> completarAtividade(context, requisicao)
         TipoRequisicao.CRIAR_ACAO -> salvarAcao(requisicao.acaoJson!!, isEdicao = false)
         TipoRequisicao.EDITAR_ACAO -> salvarAcao(requisicao.acaoJson!!, isEdicao = true)
@@ -97,84 +105,66 @@ class NotificacaoViewModel(application: Application) : AndroidViewModel(applicat
     }
   }
 
+  /**
+   * Salva ou atualiza uma atividade baseada no conteúdo serializado de uma requisição.
+   *
+   * Também cuida da reatribuição de responsáveis e atualização de notificações relacionadas.
+   */
   private suspend fun salvarAtividade(context: Context, json: String, isEdicao: Boolean) {
     val atividadeJson = Gson().fromJson(json, AtividadeJson::class.java)
     val responsaveis = atividadeJson.responsaveis ?: emptyList()
-    val funcionarioId = responsaveis.firstOrNull()
-
-    if (funcionarioId == null) {
+    val funcionarioId = responsaveis.firstOrNull() ?: run {
       Log.e("Requisicao", "Erro: nenhum responsável encontrado para a atividade")
       return
     }
 
     val novaAtividade = AtividadeEntity(
-        id = if (isEdicao) atividadeJson.id
-            ?: throw IllegalStateException("ID da atividade ausente para edição") else null,
-        nome = atividadeJson.nome,
-        descricao = atividadeJson.descricao,
-        dataInicio = atividadeJson.dataInicio,
-        dataPrazo = atividadeJson.dataPrazo,
-        acaoId = atividadeJson.acaoId,
-        funcionarioId = funcionarioId,
-        status = if (isEdicao) atividadeJson.status else StatusAtividade.PENDENTE,
-        prioridade = atividadeJson.prioridade,
-        criadoPor = atividadeJson.criadoPor,
-        dataCriacao = atividadeJson.dataCriacao
+      id = if (isEdicao) atividadeJson.id ?: throw IllegalStateException("ID ausente para edição") else null,
+      nome = atividadeJson.nome,
+      descricao = atividadeJson.descricao,
+      dataInicio = atividadeJson.dataInicio,
+      dataPrazo = atividadeJson.dataPrazo,
+      acaoId = atividadeJson.acaoId,
+      funcionarioId = funcionarioId,
+      status = if (isEdicao) atividadeJson.status else StatusAtividade.PENDENTE,
+      prioridade = atividadeJson.prioridade,
+      criadoPor = atividadeJson.criadoPor,
+      dataCriacao = atividadeJson.dataCriacao
     )
 
     if (!isEdicao) {
-      novaAtividade.id = null // Garante que Room vai gerar o ID
       val idAtividade = atividadeDao.insertComRetorno(novaAtividade).toInt()
       novaAtividade.id = idAtividade
     } else {
       val id = atividadeJson.id!!
-      val antigaAtividade = atividadeDao.getAtividadePorIdDireto(id)
+      val antiga = atividadeDao.getAtividadePorIdDireto(id)
       val antigosResponsaveis = atividadeFuncionarioDao.getResponsaveisDaAtividade(id)
       val antigosIds = antigosResponsaveis.map { it.id }
       val novosIds = responsaveis
 
-      val adicionados = novosIds - antigosIds
-      val removidos = antigosIds - novosIds
-
       atividadeDao.update(novaAtividade)
       atividadeDao.deletarRelacoesPorAtividade(id)
 
-// ⏩ Primeiro insere os responsáveis atualizados
       responsaveis.forEach { idResp ->
         atividadeDao.inserirRelacaoFuncionario(
-            AtividadeFuncionarioEntity(
-                atividadeId = id,
-                funcionarioId = idResp
-            )
+          AtividadeFuncionarioEntity(id, idResp)
         )
       }
 
-// ✅ Agora sim: chama método de alteração de prazo
       val atualizada = atividadeDao.getAtividadePorIdDireto(id)
-      val atividadeRepository = AtividadeRepository(
-          context,
-          atividadeDao,
-          db.atividadeFuncionarioDao(),
-          requisicaoDao
-      )
-      atividadeRepository.tratarAlteracaoPrazo(atualizada, antigaAtividade)
+      val repo = AtividadeRepository(context, atividadeDao, atividadeFuncionarioDao, requisicaoDao)
+      repo.tratarAlteracaoPrazo(atualizada, antiga)
 
-// 🆕 Notifica adição/remoção de responsáveis
       val funcionarioDao = db.funcionarioDao()
-      val adicionadosEntities = funcionarioDao.getByIds(adicionados)
-      val removidosEntities = funcionarioDao.getByIds(removidos)
-
-
-      atividadeRepository.notificarMudancaResponsaveis(
-        atualizada,
-        adicionadosEntities,
-        removidosEntities
-      )
-
+      val adicionados = funcionarioDao.getByIds(novosIds - antigosIds)
+      val removidos = funcionarioDao.getByIds(antigosIds - novosIds)
+      repo.notificarMudancaResponsaveis(atualizada, adicionados, removidos)
     }
   }
 
-
+  /**
+   * Marca uma atividade como concluída, se estiver dentro do prazo e com responsáveis válidos.
+   */
   private suspend fun completarAtividade(context: Context, requisicao: RequisicaoEntity) {
     val hoje = Calendar.getInstance().apply {
       set(Calendar.HOUR_OF_DAY, 0)
@@ -192,7 +182,7 @@ class NotificacaoViewModel(application: Application) : AndroidViewModel(applicat
         requisicao.copy(
           status = StatusRequisicao.RECUSADA,
           dataResposta = Date(),
-          mensagemResposta = "Atividade vencida ou sem responsável. Ajuste antes de concluir.",
+          mensagemResposta = "Atividade vencida ou sem responsável.",
           coordenadorId = getFuncionarioLogadoId(context)
         )
       )
@@ -200,44 +190,40 @@ class NotificacaoViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     val concluida = AtividadeEntity(
-        id = atividadeJson.id,
-        nome = atividadeJson.nome,
-        descricao = atividadeJson.descricao,
-        dataInicio = atividadeJson.dataInicio,
-        dataPrazo = atividadeJson.dataPrazo,
-        acaoId = atividadeJson.acaoId,
-        funcionarioId = funcionarioId,
-        status = StatusAtividade.CONCLUIDA,
-        prioridade = atividadeJson.prioridade,
-        criadoPor = atividadeJson.criadoPor,
-        dataCriacao = atividadeJson.dataCriacao
+      id = atividadeJson.id,
+      nome = atividadeJson.nome,
+      descricao = atividadeJson.descricao,
+      dataInicio = atividadeJson.dataInicio,
+      dataPrazo = atividadeJson.dataPrazo,
+      acaoId = atividadeJson.acaoId,
+      funcionarioId = funcionarioId,
+      status = StatusAtividade.CONCLUIDA,
+      prioridade = atividadeJson.prioridade,
+      criadoPor = atividadeJson.criadoPor,
+      dataCriacao = atividadeJson.dataCriacao
     )
-    val atividadeRepository = AtividadeRepository(
-        context,
-        atividadeDao,
-        db.atividadeFuncionarioDao(),
-        requisicaoDao
-    )
-    atividadeRepository.tratarConclusaoAtividade(concluida)
 
-
+    val repo = AtividadeRepository(context, atividadeDao, atividadeFuncionarioDao, requisicaoDao)
+    repo.tratarConclusaoAtividade(concluida)
   }
 
+  /**
+   * Cria ou edita uma ação com seus respectivos responsáveis.
+   */
   private suspend fun salvarAcao(json: String, isEdicao: Boolean) {
     val acaoJson = Gson().fromJson(json, AcaoJson::class.java)
 
     val acao = AcaoEntity(
-        id = if (isEdicao) acaoJson.id
-            ?: throw IllegalStateException("ID da ação ausente para edição") else null,
-        nome = acaoJson.nome,
-        descricao = acaoJson.descricao,
-        dataInicio = acaoJson.dataInicio,
-        dataPrazo = acaoJson.dataPrazo,
-        status = acaoJson.status,
-        criadoPor = acaoJson.criadoPor,
-        dataCriacao = acaoJson.dataCriacao,
-        pilarId = if (acaoJson.subpilarId == null) acaoJson.pilarId else null,
-        subpilarId = acaoJson.subpilarId
+      id = if (isEdicao) acaoJson.id ?: throw IllegalStateException("ID ausente") else null,
+      nome = acaoJson.nome,
+      descricao = acaoJson.descricao,
+      dataInicio = acaoJson.dataInicio,
+      dataPrazo = acaoJson.dataPrazo,
+      status = acaoJson.status,
+      criadoPor = acaoJson.criadoPor,
+      dataCriacao = acaoJson.dataCriacao,
+      pilarId = if (acaoJson.subpilarId == null) acaoJson.pilarId else null,
+      subpilarId = acaoJson.subpilarId
     )
 
     val idAcao = if (isEdicao) {
@@ -250,17 +236,22 @@ class NotificacaoViewModel(application: Application) : AndroidViewModel(applicat
     acaoFuncionarioDao.deletarResponsaveisPorAcao(idAcao)
     acaoJson.responsaveis.forEach { idResp ->
       acaoFuncionarioDao.inserirAcaoFuncionario(
-          AcaoFuncionarioEntity(acaoId = idAcao.toLong(), funcionarioId = idResp)
+        AcaoFuncionarioEntity(idAcao.toLong(), idResp)
       )
     }
   }
 
-
+  /**
+   * Obtém o ID do funcionário logado via SharedPreferences.
+   */
   fun getFuncionarioLogadoId(context: Context): Int {
     val prefs = context.getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
     return prefs.getInt("funcionarioId", -1)
   }
 
+  /**
+   * Insere uma nova requisição no banco de dados.
+   */
   fun inserirRequisicao(requisicao: RequisicaoEntity) {
     viewModelScope.launch {
       requisicaoDao.inserir(requisicao)
@@ -289,22 +280,15 @@ class NotificacaoViewModel(application: Application) : AndroidViewModel(applicat
     viewModelScope.launch {
       requisicaoDao.marcarNotificacoesDePrazoComoVistas(usuarioId)
     }
-    fun getNotificacoesDoApoio(id: Int): LiveData<List<RequisicaoEntity>> {
-      return requisicaoDao.getNotificacoesDoFuncionario(id)
-        .distinctUntilChanged()  // <- força atualização mesmo se for a "mesma lista"
-    }
-
-
-    // ...outros métodos
   }
 
-
+  /**
+   * Exclui logicamente um conjunto de requisições, marcando como removidas.
+   */
   fun excluirRequisicoes(lista: List<RequisicaoEntity>) {
     viewModelScope.launch {
       val ids = lista.map { it.id }
       requisicaoDao.marcarComoExcluidas(ids)
     }
   }
-
-
 }

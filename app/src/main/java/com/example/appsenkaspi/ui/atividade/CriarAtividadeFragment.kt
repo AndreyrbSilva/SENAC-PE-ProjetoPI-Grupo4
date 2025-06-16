@@ -44,30 +44,61 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Fragmento responsável pela criação de uma nova atividade dentro de uma ação específica.
+ *
+ * Permite a seleção de prioridade, responsáveis, datas e gera uma requisição ou cadastro direto,
+ * dependendo do cargo do funcionário logado. É sensível ao contexto da ação associada e seu prazo.
+ */
+
 class CriarAtividadeFragment : Fragment() {
+  /** Binding inflado para acesso aos elementos da interface. */
 
   private var _binding: FragmentCriarAtividadeBinding? = null
   private val binding get() = _binding!!
   private var dataPrazoPilar: Date? = null
   private var dataPrazoAcao: Date? = null
+  /** ViewModel que gerencia dados e lógica das atividades. */
 
   private val atividadeViewModel: AtividadeViewModel by activityViewModels()
+  /** ViewModel responsável pelas informações do funcionário logado. */
+
   private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
+  /** ViewModel para consulta e atualização da ação associada. */
+
   private val acaoViewModel: AcaoViewModel by activityViewModels()
 
   private var dataInicio: Date? = null
   private var dataFim: Date? = null
+
+  /** Prioridade da atividade, definida via diálogo. */
+
   private var prioridadeSelecionada: PrioridadeAtividade? = null
+
+  /** Lista de funcionários atribuídos à atividade. */
+
   private val funcionariosSelecionados = mutableListOf<FuncionarioEntity>()
+  /** ID da ação à qual esta atividade está vinculada. */
+
   private var acaoId: Int = -1
 
+  /** ViewModel para controle de notificações. */
+
   private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
+
+  /**
+   * Infla o layout do fragmento e retorna a raiz da view.
+   */
 
   override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
     _binding = FragmentCriarAtividadeBinding.inflate(inflater, container, false)
     return binding.root
   }
 
+  /**
+   * Inicializa os componentes da interface após a criação da view.
+   * Define comportamentos conforme cargo do usuário e trata interações de clique.
+   */
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)
     configurarBotaoVoltar(view)
@@ -247,7 +278,10 @@ class CriarAtividadeFragment : Fragment() {
       }
     }
   }
-
+  /**
+   * Exibe um seletor de data (DatePickerDialog) e atualiza o campo correspondente na UI.
+   * @param isInicio Se verdadeiro, define a data de início. Caso contrário, define a de término.
+   */
   private fun abrirDatePicker(isInicio: Boolean) {
     val calendario = Calendar.getInstance()
     DatePickerDialog(
@@ -269,7 +303,10 @@ class CriarAtividadeFragment : Fragment() {
         calendario.get(Calendar.DAY_OF_MONTH)
     ).show()
   }
-
+  /**
+   * Exibe imagens de perfil dos responsáveis selecionados, com borda e layout horizontal.
+   * @param lista Lista de responsáveis selecionados.
+   */
   private fun exibirFotosSelecionadas(lista: List<FuncionarioEntity>) {
     val container = binding.containerFotosResponsaveis
     container.removeAllViews()
@@ -293,6 +330,9 @@ class CriarAtividadeFragment : Fragment() {
       container.addView(imageView)
     }
   }
+  /**
+   * Valida os dados da atividade, insere no banco e atualiza os relacionamentos com os responsáveis.
+   */
 
   private fun confirmarCriacaoAtividade() {
     val nome = binding.inputNomeAtividade.text.toString().trim()
@@ -356,6 +396,10 @@ class CriarAtividadeFragment : Fragment() {
       parentFragmentManager.popBackStack()
     }
   }
+  /**
+   * Verifica se as datas de início e fim estão dentro dos limites impostos pela ação.
+   * @return True se válidas, false se inconsistentes ou além do prazo da ação.
+   */
 
   private fun validarDatasComAcao(): Boolean {
     if (dataInicio == null || dataFim == null || dataPrazoAcao == null) {
@@ -384,7 +428,11 @@ class CriarAtividadeFragment : Fragment() {
 
     return true
   }
-
+  /**
+   * Remove componentes de hora, minuto, segundo e milissegundo de uma data.
+   * @param data Data original.
+   * @return Nova data truncada para o início do dia.
+   */
   private fun truncarData(data: Date): Date {
     return Calendar.getInstance().apply {
       time = data
@@ -394,7 +442,11 @@ class CriarAtividadeFragment : Fragment() {
       set(Calendar.MILLISECOND, 0)
     }.time
   }
-
+  /**
+   * Define o status inicial da atividade com base na data atual.
+   * @param dataPrazo Data de prazo da atividade.
+   * @return StatusAtividade.VENCIDA se prazo ≤ hoje; caso contrário, PENDENTE.
+   */
   private fun calcularStatusInicial(dataPrazo: Date): StatusAtividade {
     val formato = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     val hojeStr = formato.format(Date())
@@ -404,6 +456,9 @@ class CriarAtividadeFragment : Fragment() {
   }
 
 
+  /**
+   * Libera o binding da view para evitar vazamento de memória.
+   */
   override fun onDestroyView() {
     super.onDestroyView()
     _binding = null

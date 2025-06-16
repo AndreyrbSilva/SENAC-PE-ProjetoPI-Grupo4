@@ -9,49 +9,92 @@ import androidx.room.Query
 import androidx.room.Update
 import com.example.appsenkaspi.data.local.entity.FuncionarioEntity
 
+/**
+ * DAO responsável pelas operações relacionadas à entidade Funcionario.
+ * Inclui autenticação, busca por ID, inserções em lote e observação reativa da lista de funcionários.
+ */
 @Dao
 interface FuncionarioDao {
 
-    @Query("SELECT * FROM funcionarios WHERE id_acesso = :idAcesso AND senha = :senha LIMIT 1")
-    suspend fun autenticar(idAcesso: Int, senha: String): FuncionarioEntity?
+  /**
+   * Realiza a autenticação de um funcionário com base no ID de acesso e senha.
+   *
+   * @param idAcesso identificador de login
+   * @param senha senha fornecida
+   * @return Funcionário autenticado ou null se inválido
+   */
+  @Query("SELECT * FROM funcionarios WHERE id_acesso = :idAcesso AND senha = :senha LIMIT 1")
+  suspend fun autenticar(idAcesso: Int, senha: String): FuncionarioEntity?
 
-    @Query("SELECT * FROM funcionarios")
-    suspend fun buscarTodos(): List<FuncionarioEntity>
+  /**
+   * Retorna todos os funcionários cadastrados.
+   */
+  @Query("SELECT * FROM funcionarios")
+  suspend fun buscarTodos(): List<FuncionarioEntity>
 
-    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
-    suspend fun inserirFuncionario(funcionario: FuncionarioEntity)
+  /**
+   * Insere um novo funcionário ou substitui se já existir.
+   */
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun inserirFuncionario(funcionario: FuncionarioEntity)
 
-    @Query("SELECT * FROM funcionarios WHERE id = :id LIMIT 1")
-    suspend fun buscarPorId(id: Int): FuncionarioEntity?
+  /**
+   * Busca um funcionário por ID com resultado limitado a 1.
+   */
+  @Query("SELECT * FROM funcionarios WHERE id = :id LIMIT 1")
+  suspend fun buscarPorId(id: Int): FuncionarioEntity?
 
-    @Query("SELECT * FROM funcionarios WHERE id = :id")
-    suspend fun buscarFuncionarioPorId(id: Int): FuncionarioEntity?
+  /**
+   * Busca um funcionário por ID (sem LIMIT, mas função equivalente).
+   */
+  @Query("SELECT * FROM funcionarios WHERE id = :id")
+  suspend fun buscarFuncionarioPorId(id: Int): FuncionarioEntity?
 
-    @Query("SELECT * FROM funcionarios")
-    fun listarTodosFuncionarios(): LiveData<List<FuncionarioEntity>>
+  /**
+   * Lista todos os funcionários como LiveData para observação reativa.
+   */
+  @Query("SELECT * FROM funcionarios")
+  fun listarTodosFuncionarios(): LiveData<List<FuncionarioEntity>>
 
-    @Query("SELECT * FROM funcionarios WHERE id IN (:ids)")
-    suspend fun getByIds(ids: List<Int>): List<FuncionarioEntity>
+  /**
+   * Retorna uma lista de funcionários cujos IDs estejam contidos na lista fornecida.
+   */
+  @Query("SELECT * FROM funcionarios WHERE id IN (:ids)")
+  suspend fun getByIds(ids: List<Int>): List<FuncionarioEntity>
 
-    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
-    suspend fun inserir(funcionario: FuncionarioEntity)
+  /**
+   * Insere um funcionário (substituindo em caso de conflito).
+   */
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun inserir(funcionario: FuncionarioEntity)
 
-    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
-    suspend fun inserirTodos(funcionarios: List<FuncionarioEntity>)
-    @Update
-    suspend fun atualizarFuncionario(funcionario: FuncionarioEntity)
+  /**
+   * Insere múltiplos funcionários de uma vez.
+   */
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun inserirTodos(funcionarios: List<FuncionarioEntity>)
 
-    @Delete
-    suspend fun deletarFuncionario(funcionario: FuncionarioEntity)
+  /**
+   * Atualiza os dados de um funcionário existente.
+   */
+  @Update
+  suspend fun atualizarFuncionario(funcionario: FuncionarioEntity)
 
-    @Query("SELECT * FROM funcionarios WHERE id IN (:ids)")
-    suspend fun getFuncionariosPorIds(ids: List<Int>): List<FuncionarioEntity>
+  /**
+   * Remove um funcionário do banco.
+   */
+  @Delete
+  suspend fun deletarFuncionario(funcionario: FuncionarioEntity)
 
-    @Query("SELECT * FROM funcionarios WHERE id = :id LIMIT 1")
-    suspend fun getFuncionarioById(id: Int): FuncionarioEntity?
+  /**
+   * Retorna os funcionários cujos IDs estão na lista especificada.
+   */
+  @Query("SELECT * FROM funcionarios WHERE id IN (:ids)")
+  suspend fun getFuncionariosPorIds(ids: List<Int>): List<FuncionarioEntity>
 
-
-
-
-
+  /**
+   * Retorna um único funcionário por ID.
+   */
+  @Query("SELECT * FROM funcionarios WHERE id = :id LIMIT 1")
+  suspend fun getFuncionarioById(id: Int): FuncionarioEntity?
 }

@@ -39,20 +39,55 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.*
 
+/**
+ * Fragmento responsável por exibir os detalhes de um Pilar que contém Subpilares.
+ *
+ * Este fragmento exibe as seguintes informações e funcionalidades:
+ * - Nome, descrição, data de prazo e progresso do Pilar.
+ * - Lista dos Subpilares associados, com barra de progresso individual.
+ * - Botões de ação para editar o Pilar, adicionar novos Subpilares ou concluir o Pilar (apenas para Coordenadores).
+ * - Expansão da descrição com animação e toggle visual.
+ * - Integração com `PilarViewModel`, `SubpilarViewModel`, `FuncionarioViewModel` e `NotificacaoViewModel`.
+ *
+ * Funcionalidades inteligentes:
+ * - A visibilidade dos botões de ação varia de acordo com o cargo do usuário (Coordenação, Apoio, Gestor).
+ * - O progresso é recalculado dinamicamente com base nas ações e subpilares.
+ * - A conclusão do Pilar é condicional ao progresso total e à data de vencimento.
+ *
+ * Requisitos do layout XML:
+ * - IDs esperados: `tituloPilar`, `subtituloPilar`, `dataPrazoPilar`, `progressoPilar`, `percentual`, `recyclerSubpilares`,
+ *   `cardEditarPilar`, `cardAdicionarSubPilares`, `cardConcluirPilar`, `iconeMenu`, `sobreWrapper`, `headerLayout`.
+ *
+ * @see PilarViewModel
+ * @see SubpilarViewModel
+ * @see FuncionarioViewModel
+ * @see NotificacaoViewModel
+ * @see TelaSubpilarComAcoesFragment
+ */
 class TelaPilarComSubpilaresFragment : Fragment() {
 
+  // Binding da View
   private var _binding: FragmentTelaPilarComSubpilaresBinding? = null
   private val binding get() = _binding!!
 
+  // ViewModels compartilhados via activity
   private val pilarViewModel: PilarViewModel by activityViewModels()
   private val subpilarViewModel: SubpilarViewModel by activityViewModels()
   private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
   private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
 
+  // ID do Pilar carregado
   private var pilarId: Int = -1
+
+  // Adapter para o RecyclerView de Subpilares
   private lateinit var subpilarAdapter: TelaSubpilarAdapter
+
+  // Mapa com progresso por Subpilar
   private val progressoMap = mutableMapOf<Int, Float>()
 
+  /**
+   * Infla o layout do fragmento.
+   */
   override fun onCreateView(
     inflater: LayoutInflater, container: ViewGroup?,
     savedInstanceState: Bundle?
@@ -61,9 +96,13 @@ class TelaPilarComSubpilaresFragment : Fragment() {
     return binding.root
   }
 
+  /**
+   * Inicializa a interface e observa os dados do Pilar e seus Subpilares.
+   */
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)
 
+    // Validação do Pilar
     pilarId = arguments?.getInt("pilarId") ?: -1
     if (pilarId == -1) {
       Toast.makeText(requireContext(), "Pilar inválido!", Toast.LENGTH_SHORT).show()
@@ -71,90 +110,25 @@ class TelaPilarComSubpilaresFragment : Fragment() {
       return
     }
 
+    configurarBotaoVoltar(view)
+    configurarRecycler()
+    configurarBotoes()
+    observarCargoFuncionario(view)
+    observarPilar()
+    observarSubpilares()
+    binding.iconeMenu.setOnClickListener { toggleSobre() }
+
+    // Anima progresso inicial
     viewLifecycleOwner.lifecycleScope.launch {
       val progresso = pilarViewModel.calcularProgressoInterno(pilarId)
       pilarViewModel.atualizarStatusAutomaticamente(pilarId)
       animarProgresso((progresso * 100).toInt())
     }
-
-    configurarBotaoVoltar(view)
-    configurarRecycler()
-    configurarBotoes()
-
-    funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
-      funcionario?.let {
-        configurarNotificacaoBadge(
-          rootView = view,
-          lifecycleOwner = viewLifecycleOwner,
-          fragmentManager = parentFragmentManager,
-          funcionarioId = it.id,
-          cargo = it.cargo,
-          viewModel = notificacaoViewModel
-        )
-
-        when (it.cargo) {
-          Cargo.APOIO, Cargo.GESTOR -> {
-            binding.cardEditarPilar.visibility = View.GONE
-            binding.cardAdicionarSubPilares.visibility = View.GONE
-            binding.cardConcluirPilar.visibility = View.GONE
-          }
-
-          Cargo.COORDENADOR -> {
-            binding.cardEditarPilar.visibility = View.VISIBLE
-            binding.cardAdicionarSubPilares.visibility = View.VISIBLE
-            binding.cardConcluirPilar.visibility = View.VISIBLE
-          }
-
-          else -> {
-            binding.cardEditarPilar.visibility = View.GONE
-            binding.cardAdicionarSubPilares.visibility = View.GONE
-          }
-        }
-      }
-    }
-
-    pilarViewModel.getPilarById(pilarId).observe(viewLifecycleOwner) { pilar ->
-      if (pilar != null) {
-        preencherCamposComPilar(pilar)
-      } else {
-        Toast.makeText(requireContext(), "Pilar não encontrado!", Toast.LENGTH_SHORT).show()
-        parentFragmentManager.popBackStack()
-      }
-    }
-
-    binding.cardConcluirPilar.setOnClickListener {
-      lifecycleScope.launch {
-        pilarViewModel.concluirPilar(pilarId)
-        pilarViewModel.getPilarById(pilarId).observe(viewLifecycleOwner) { pilar ->
-          if (pilar != null) {
-            preencherCamposComPilar(pilar)
-            Toast.makeText(requireContext(), "Pilar concluído com sucesso!", Toast.LENGTH_SHORT).show()
-          }
-        }
-      }
-    }
-
-    subpilarViewModel.listarSubpilaresPorPilar(pilarId).observe(viewLifecycleOwner) { subpilares ->
-      viewLifecycleOwner.lifecycleScope.launch {
-        progressoMap.clear()
-        val progressoList = subpilares.map { subpilar ->
-          async {
-            val progresso = subpilarViewModel.calcularProgressoInterno(subpilar.id)
-            subpilar.id to progresso
-          }
-        }.awaitAll()
-        progressoMap.putAll(progressoList.toMap())
-        subpilarAdapter.submitList(subpilares.toList())
-      }
-
-      pilarViewModel.calcularProgressoDoPilar(pilarId) { progresso ->
-        animarProgresso((progresso * 100).toInt())
-      }
-    }
-
-    binding.iconeMenu.setOnClickListener { toggleSobre() }
   }
 
+  /**
+   * Inicializa ações de botões (editar, criar subpilar).
+   */
   private fun configurarBotoes() {
     binding.cardEditarPilar.setOnClickListener {
       parentFragmentManager.beginTransaction()
@@ -183,59 +157,124 @@ class TelaPilarComSubpilaresFragment : Fragment() {
         .addToBackStack(null)
         .commit()
     }
+
+    binding.cardConcluirPilar.setOnClickListener {
+      lifecycleScope.launch {
+        pilarViewModel.concluirPilar(pilarId)
+        pilarViewModel.getPilarById(pilarId).observe(viewLifecycleOwner) { pilar ->
+          if (pilar != null) {
+            preencherCamposComPilar(pilar)
+            Toast.makeText(requireContext(), "Pilar concluído com sucesso!", Toast.LENGTH_SHORT).show()
+          }
+        }
+      }
+    }
   }
 
+  /**
+   * Observa o cargo do funcionário e ajusta visibilidade dos cards.
+   */
+  private fun observarCargoFuncionario(view: View) {
+    funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
+      funcionario?.let {
+        configurarNotificacaoBadge(
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = notificacaoViewModel
+        )
+
+        binding.cardEditarPilar.visibility =
+          if (it.cargo == Cargo.COORDENADOR) View.VISIBLE else View.GONE
+        binding.cardAdicionarSubPilares.visibility =
+          if (it.cargo == Cargo.COORDENADOR) View.VISIBLE else View.GONE
+        binding.cardConcluirPilar.visibility =
+          if (it.cargo == Cargo.COORDENADOR) View.VISIBLE else View.GONE
+      }
+    }
+  }
+
+  /**
+   * Observa o Pilar e preenche os campos na tela.
+   */
+  private fun observarPilar() {
+    pilarViewModel.getPilarById(pilarId).observe(viewLifecycleOwner) { pilar ->
+      if (pilar != null) {
+        preencherCamposComPilar(pilar)
+      } else {
+        Toast.makeText(requireContext(), "Pilar não encontrado!", Toast.LENGTH_SHORT).show()
+        parentFragmentManager.popBackStack()
+      }
+    }
+  }
+
+  /**
+   * Preenche os dados do Pilar na tela.
+   */
   private fun preencherCamposComPilar(pilar: PilarEntity) {
     binding.tituloPilar.text = "${pilar.id}° Pilar"
     binding.subtituloPilar.apply {
       text = pilar.nome.ifBlank { "Sem nome" }
       paintFlags = paintFlags or Paint.UNDERLINE_TEXT_FLAG
     }
-
-    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    binding.dataPrazoPilar.text = "Prazo: ${sdf.format(pilar.dataPrazo)}"
+    binding.dataPrazoPilar.text = "Prazo: ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(pilar.dataPrazo)}"
     binding.textoSobre.text = pilar.descricao.ifBlank { "Nenhuma descrição adicionada." }
 
-    viewLifecycleOwner.lifecycleScope.launch {
+    lifecycleScope.launch {
       val progresso = withContext(Dispatchers.IO) {
         pilarViewModel.calcularProgressoInterno(pilar.id).also {
           pilarViewModel.atualizarStatusAutomaticamente(pilar.id)
         }
       }
-
       animarProgresso((progresso * 100).toInt())
 
-      val pilarAtualizado = pilarViewModel.getPilarById(pilar.id).value ?: pilar
+      val atualizado = pilarViewModel.getPilarById(pilar.id).value ?: pilar
+      val podeConcluir = pilarViewModel.podeConcluirPilar(pilar.id, pilar.dataPrazo.toLocalDate())
 
-      if (pilarAtualizado.status == StatusPilar.CONCLUIDO) {
-        binding.cardConcluirPilar.visibility = View.GONE
-      } else {
-        val dataVencimento = pilar.dataPrazo.toLocalDate()
-        val podeConcluir = withContext(Dispatchers.IO) {
-          pilarViewModel.podeConcluirPilar(pilar.id, dataVencimento)
-        }
-        binding.cardConcluirPilar.visibility = if (podeConcluir) View.VISIBLE else View.GONE
+      binding.cardConcluirPilar.visibility = if (
+        atualizado.status != StatusPilar.CONCLUIDO && podeConcluir
+      ) View.VISIBLE else View.GONE
+    }
+  }
+
+  /**
+   * Observa os Subpilares do Pilar e atualiza a lista com progresso.
+   */
+  private fun observarSubpilares() {
+    subpilarViewModel.listarSubpilaresPorPilar(pilarId).observe(viewLifecycleOwner) { subpilares ->
+      lifecycleScope.launch {
+        progressoMap.clear()
+        val progressoList = subpilares.map { subpilar ->
+          async { subpilar.id to subpilarViewModel.calcularProgressoInterno(subpilar.id) }
+        }.awaitAll()
+        progressoMap.putAll(progressoList.toMap())
+        subpilarAdapter.submitList(subpilares.toList())
+      }
+
+      pilarViewModel.calcularProgressoDoPilar(pilarId) { progresso ->
+        animarProgresso((progresso * 100).toInt())
       }
     }
   }
 
-  private fun Date.toLocalDate(): LocalDate {
-    return this.toInstant()
-      .atZone(ZoneId.systemDefault())
-      .toLocalDate()
-  }
-
+  /**
+   * Configura RecyclerView para exibir Subpilares com progresso.
+   */
   private fun configurarRecycler() {
     binding.recyclerSubpilares.layoutManager = LinearLayoutManager(requireContext())
     subpilarAdapter = TelaSubpilarAdapter(
-      onClick = { subpilar -> abrirTelaSubpilar(subpilar) },
+      onClick = { abrirTelaSubpilar(it) },
       progressoMap = progressoMap
     )
     binding.recyclerSubpilares.adapter = subpilarAdapter
   }
 
+  /**
+   * Abre tela de visualização detalhada de um Subpilar.
+   */
   private fun abrirTelaSubpilar(subpilar: SubpilarEntity) {
-    val frag = TelaSubpilarComAcoesFragment.Companion.newInstance(subpilar.id)
     parentFragmentManager.beginTransaction()
       .setCustomAnimations(
         R.anim.slide_fade_in_right,
@@ -243,11 +282,14 @@ class TelaPilarComSubpilaresFragment : Fragment() {
         R.anim.slide_fade_in_left,
         R.anim.slide_fade_out_right
       )
-      .replace(R.id.main_container, frag)
+      .replace(R.id.main_container, TelaSubpilarComAcoesFragment.newInstance(subpilar.id))
       .addToBackStack(null)
       .commit()
   }
 
+  /**
+   * Alterna visibilidade da descrição do Pilar.
+   */
   private fun toggleSobre() {
     val transition = AutoTransition().apply { duration = 300 }
     TransitionManager.beginDelayedTransition(binding.cabecalhoCard, transition)
@@ -262,6 +304,9 @@ class TelaPilarComSubpilaresFragment : Fragment() {
     }
   }
 
+  /**
+   * Anima a barra de progresso com valor inteiro de 0 a 100.
+   */
   private fun animarProgresso(target: Int) {
     ObjectAnimator.ofInt(binding.progressoPilar, "progress", target).apply {
       duration = 60L
@@ -276,6 +321,9 @@ class TelaPilarComSubpilaresFragment : Fragment() {
   }
 
   companion object {
+    /**
+     * Cria uma nova instância do fragmento com o ID do Pilar.
+     */
     fun newInstance(pilarId: Int): TelaPilarComSubpilaresFragment {
       return TelaPilarComSubpilaresFragment().apply {
         arguments = Bundle().apply {
@@ -283,5 +331,9 @@ class TelaPilarComSubpilaresFragment : Fragment() {
         }
       }
     }
+  }
+
+  private fun Date.toLocalDate(): LocalDate {
+    return this.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
   }
 }

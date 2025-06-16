@@ -37,52 +37,69 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 
+/**
+ * Fragmento responsável por exibir o perfil do funcionário logado, incluindo:
+ * - Foto de perfil e banner, com opção de edição e persistência local.
+ * - Tabs com seções de "Detalhes" e "Meus Trabalhos".
+ * - Nome do usuário.
+ * - Integração com sistema de notificações.
+ * - Botão de logout com confirmação.
+ *
+ * Funcionalidades:
+ * - Imagens são redimensionadas e salvas internamente com nomes únicos baseados no ID do funcionário.
+ * - As imagens e informações são persistidas em banco local (Room) e exibidas com Glide.
+ * - Utiliza `SharedPreferences` para obter o ID do usuário logado.
+ * - Lida com permissões e intents para seleção de imagens via `ActivityResultLauncher`.
+ * - Realiza logout limpando as preferências e redirecionando para `MainActivity`.
+ *
+ * Dependências:
+ * - ViewModel: [FuncionarioViewModel], [NotificacaoViewModel]
+ * - DAO: [FuncionarioDao]
+ * - Layout: `fragment_perfil.xml` com `TabLayout`, `ViewPager2`, `ImageView`, `TextView`, e botões de edição/logout.
+ */
 class PerfilFragment : Fragment() {
 
+  // Imagens de perfil e banner
   private lateinit var imageViewPerfil: ImageView
   private lateinit var imageViewBanner: ImageView
 
+  // Launchers para seleção de imagem via galeria
   private lateinit var perfilImageLauncher: ActivityResultLauncher<Intent>
   private lateinit var bannerImageLauncher: ActivityResultLauncher<Intent>
 
+  // Identificador do funcionário e DAO
   private var idFuncionarioLogado: Int = -1
   private lateinit var funcionarioDao: FuncionarioDao
 
+  // ViewModels compartilhados com a atividade
   private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
   private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
-
+    // Recupera ID do funcionário salvo em SharedPreferences
     val prefs = requireContext().getSharedPreferences("funcionario_prefs", Context.MODE_PRIVATE)
     idFuncionarioLogado = prefs.getInt("funcionario_id", -1)
 
-    Log.d("PerfilFragment", "ID do funcionário logado: $idFuncionarioLogado")
+    funcionarioDao = AppDatabase.getDatabase(requireContext()).funcionarioDao()
 
-    funcionarioDao = AppDatabase.Companion.getDatabase(requireContext()).funcionarioDao()
-
+    // Configura a seleção e salvamento da imagem de perfil
     perfilImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
       if (result.resultCode == Activity.RESULT_OK) {
-        val uriOriginal = result.data?.data
-        Log.d("PerfilFragment", "URI original da imagem de perfil: $uriOriginal")
-        uriOriginal?.let {
+        val uri = result.data?.data
+        uri?.let {
           val nomeArquivo = "perfil_usuario_$idFuncionarioLogado.jpg"
           val uriInterna = redimensionarESalvarImagem(it, nomeArquivo, 76, 76)
-
           uriInterna?.let { finalUri ->
-            Log.d("PerfilFragment", "Imagem de perfil salva em: ${finalUri.path}")
             Glide.with(requireContext())
-              .load(File(finalUri.path!!))
-              .circleCrop()
+              .load(File(finalUri.path!!)).circleCrop()
               .placeholder(R.drawable.ic_icone_perfil)
               .into(imageViewPerfil)
 
             lifecycleScope.launch {
               funcionarioDao.getFuncionarioById(idFuncionarioLogado)?.let { funcionario ->
-                val atualizado = funcionario.copy(fotoPerfil = finalUri.toString())
-                funcionarioDao.atualizarFuncionario(atualizado)
-                Log.d("PerfilFragment", "fotoPerfil atualizada no banco: ${finalUri}" )
+                funcionarioDao.atualizarFuncionario(funcionario.copy(fotoPerfil = finalUri.toString()))
               }
             }
           }
@@ -90,23 +107,18 @@ class PerfilFragment : Fragment() {
       }
     }
 
+    // Configura a seleção e salvamento da imagem de banner
     bannerImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
       if (result.resultCode == Activity.RESULT_OK) {
-        val uriOriginal = result.data?.data
-        Log.d("PerfilFragment", "URI original da imagem do banner: $uriOriginal")
-        uriOriginal?.let {
+        val uri = result.data?.data
+        uri?.let {
           val nomeArquivo = "banner_usuario_$idFuncionarioLogado.jpg"
           val uriInterna = redimensionarESalvarImagem(it, nomeArquivo, 1080, 600)
-
           uriInterna?.let { finalUri ->
             imageViewBanner.setImageURI(finalUri)
-            Log.d("PerfilFragment", "Imagem de banner salva em: ${finalUri.path}")
-
             lifecycleScope.launch {
               funcionarioDao.getFuncionarioById(idFuncionarioLogado)?.let { funcionario ->
-                val atualizado = funcionario.copy(fotoBanner = finalUri.toString())
-                funcionarioDao.atualizarFuncionario(atualizado)
-                Log.d("PerfilFragment", "fotoBanner atualizada no banco: ${finalUri}" )
+                funcionarioDao.atualizarFuncionario(funcionario.copy(fotoBanner = finalUri.toString()))
               }
             }
           }
@@ -119,33 +131,37 @@ class PerfilFragment : Fragment() {
     val view = inflater.inflate(R.layout.fragment_perfil, container, false)
     val nomeUsuarioTextView = view.findViewById<TextView>(R.id.user_name)
 
+    // Configura badge de notificação
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       funcionario?.let {
-          configurarNotificacaoBadge(
-              rootView = view,
-              lifecycleOwner = viewLifecycleOwner,
-              fragmentManager = parentFragmentManager,
-              funcionarioId = it.id,
-              cargo = it.cargo,
-              viewModel = notificacaoViewModel
-          )
+        configurarNotificacaoBadge(
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = notificacaoViewModel
+        )
       }
     }
+
+    // Configura tabs e ViewPager
     val tabLayout = view.findViewById<TabLayout>(R.id.tabLayout)
     val viewPager = view.findViewById<ViewPager2>(R.id.viewPager)
     viewPager.adapter = PerfilPagerAdapter(this)
 
     TabLayoutMediator(tabLayout, viewPager) { tab, position ->
-        tab.text = when (position) {
-            0 -> "Detalhes"
-            1 -> "Meus Trabalhos"
-            else -> ""
-        }
+      tab.text = when (position) {
+        0 -> "Detalhes"
+        1 -> "Meus Trabalhos"
+        else -> ""
+      }
     }.attach()
 
     imageViewPerfil = view.findViewById(R.id.profile_pic)
     imageViewBanner = view.findViewById(R.id.banner)
 
+    // Botões para editar imagens
     view.findViewById<ImageButton>(R.id.edit_profile_pic_button).setOnClickListener {
       val intent = Intent(Intent.ACTION_PICK).apply { type = "image/*" }
       perfilImageLauncher.launch(intent)
@@ -156,45 +172,38 @@ class PerfilFragment : Fragment() {
       bannerImageLauncher.launch(intent)
     }
 
-    // NOVO: Configurar botão logout com confirmação
-    val logoutButton = view.findViewById<Button>(R.id.logoutButton)
-    logoutButton.setOnClickListener {
+    // Botão de logout
+    view.findViewById<Button>(R.id.logoutButton).setOnClickListener {
       mostrarConfirmacaoLogout()
     }
 
+    // Carrega informações do usuário e imagens
     lifecycleScope.launch {
       val funcionario = funcionarioDao.getFuncionarioById(idFuncionarioLogado)
-      Log.d("PerfilFragment", "Funcionario carregado: $funcionario")
-
       nomeUsuarioTextView.text = funcionario?.nomeCompleto ?: "Usuário"
 
-      val uriPerfil = funcionario?.fotoPerfil
-      if (!uriPerfil.isNullOrBlank() && uriPerfil.startsWith("file://")) {
-        Log.d("PerfilFragment", "Carregando imagem de perfil de: $uriPerfil")
+      funcionario?.fotoPerfil?.let { uri ->
         Glide.with(requireContext())
-          .load(File(Uri.parse(uriPerfil).path!!))
-          .circleCrop()
-          .placeholder(R.drawable.ic_icone_perfil)
-          .into(imageViewPerfil)
-      } else {
-        Glide.with(requireContext())
-          .load(R.drawable.ic_icone_perfil)
+          .load(if (uri.startsWith("file://")) File(Uri.parse(uri).path!!) else R.drawable.ic_icone_perfil)
           .circleCrop()
           .into(imageViewPerfil)
       }
 
-      val uriBanner = funcionario?.fotoBanner
-      if (!uriBanner.isNullOrBlank() && uriBanner.startsWith("file://")) {
-        Log.d("PerfilFragment", "Carregando imagem de banner de: $uriBanner")
-        imageViewBanner.setImageURI(Uri.parse(uriBanner))
-      } else {
-        imageViewBanner.setImageResource(R.drawable.ic_imagemfundo)
+      funcionario?.fotoBanner?.let { uri ->
+        if (uri.startsWith("file://")) {
+          imageViewBanner.setImageURI(Uri.parse(uri))
+        } else {
+          imageViewBanner.setImageResource(R.drawable.ic_imagemfundo)
+        }
       }
     }
 
     return view
   }
 
+  /**
+   * Exibe um diálogo de confirmação para logout.
+   */
   private fun mostrarConfirmacaoLogout() {
     AlertDialog.Builder(requireContext())
       .setTitle("Confirmação")
@@ -210,12 +219,13 @@ class PerfilFragment : Fragment() {
       .show()
   }
 
+  /**
+   * Limpa preferências do usuário logado e redireciona para a tela principal.
+   */
   private fun realizarLogout() {
-    // Limpar SharedPreferences do login
     val prefs = requireContext().getSharedPreferences("funcionario_prefs", Context.MODE_PRIVATE)
     prefs.edit().clear().apply()
 
-    // Abrir MainActivity com animação suave e limpar backstack
     val intent = Intent(requireContext(), MainActivity::class.java)
     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
 
@@ -229,6 +239,15 @@ class PerfilFragment : Fragment() {
     requireActivity().finish()
   }
 
+  /**
+   * Redimensiona uma imagem e salva no diretório interno do app.
+   *
+   * @param uriOriginal URI da imagem original selecionada
+   * @param nomeArquivo Nome do arquivo salvo localmente
+   * @param largura Largura em pixels
+   * @param altura Altura em pixels
+   * @return URI da imagem salva localmente ou null em caso de erro
+   */
   private fun redimensionarESalvarImagem(uriOriginal: Uri, nomeArquivo: String, largura: Int, altura: Int): Uri? {
     return try {
       val source = ImageDecoder.createSource(requireContext().contentResolver, uriOriginal)
@@ -236,11 +255,10 @@ class PerfilFragment : Fragment() {
       val bitmapRedimensionado = Bitmap.createScaledBitmap(bitmapOriginal, largura, altura, true)
 
       val arquivo = File(requireContext().filesDir, nomeArquivo)
-      val outputStream = FileOutputStream(arquivo)
-      bitmapRedimensionado.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
-      outputStream.close()
+      FileOutputStream(arquivo).use { out ->
+        bitmapRedimensionado.compress(Bitmap.CompressFormat.JPEG, 90, out)
+      }
 
-      Log.d("PerfilFragment", "Imagem salva em: ${arquivo.absolutePath}")
       Uri.fromFile(arquivo)
     } catch (e: Exception) {
       Log.e("PerfilFragment", "Erro ao salvar imagem redimensionada", e)

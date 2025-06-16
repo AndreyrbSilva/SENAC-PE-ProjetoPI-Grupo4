@@ -22,15 +22,34 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+/**
+ * Fragmento responsável por exibir os detalhes de uma requisição pendente.
+ *
+ * Exibe dinamicamente as informações contidas na entidade [RequisicaoEntity] com base no tipo de requisição:
+ * - Criação ou edição de Ação
+ * - Criação ou edição de Atividade
+ * - Conclusão de Atividade
+ *
+ * Permite ao Coordenador aceitar ou recusar a requisição.
+ *
+ * Este fragmento é ativado com o ID da requisição como argumento (`requisicaoId`) e recupera os dados via [NotificacaoViewModel].
+ */
 class DetalheNotificacaoFragment : Fragment() {
 
+  /** ViewModel responsável pelas requisições e notificações */
   private val viewModel: NotificacaoViewModel by activityViewModels()
+
+  /** Requisição atualmente sendo exibida */
   private lateinit var requisicao: RequisicaoEntity
+
+  /** Formatação de datas no formato 'dd de MMMM de yyyy' */
   private val formatoData = SimpleDateFormat("dd 'de' MMMM 'de' yyyy", Locale.getDefault())
+
+  /** ViewModel auxiliar para acesso aos dados de atividades, se necessário */
   private val atividadeViewModel: AtividadeViewModel by activityViewModels()
 
   override fun onCreateView(
-      inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
   ): View {
     return inflater.inflate(R.layout.fragment_detalhe_notificacao, container, false)
   }
@@ -38,6 +57,7 @@ class DetalheNotificacaoFragment : Fragment() {
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     val requisicaoId = arguments?.getInt("requisicaoId") ?: return
 
+    // Observa a requisição específica e atualiza os elementos de UI
     viewModel.getRequisicaoPorId(requisicaoId).observe(viewLifecycleOwner) { req ->
       requisicao = req ?: return@observe
 
@@ -52,10 +72,13 @@ class DetalheNotificacaoFragment : Fragment() {
       val tvPrioridade = view.findViewById<TextView>(R.id.tvPrioridade)
       val tvPrioridadeBox = view.findViewById<TextView>(R.id.tvPrioridadeBox)
 
+      /**
+       * Carrega e exibe os nomes dos responsáveis com base nos IDs fornecidos.
+       */
       fun carregarNomesResponsaveis(ids: List<Int>) {
         if (ids.isNotEmpty()) {
           lifecycleScope.launch {
-            val nomes = AppDatabase.Companion.getDatabase(requireContext())
+            val nomes = AppDatabase.getDatabase(requireContext())
               .funcionarioDao()
               .getFuncionariosPorIds(ids)
               .joinToString { it.nomeCompleto }
@@ -66,13 +89,12 @@ class DetalheNotificacaoFragment : Fragment() {
         }
       }
 
+      // Renderiza os dados conforme o tipo da requisição
       when (requisicao.tipo) {
         TipoRequisicao.CRIAR_ACAO, TipoRequisicao.EDITAR_ACAO -> {
           val acao = Gson().fromJson(requisicao.acaoJson, AcaoJson::class.java)
           tvTituloTopo.text = if (requisicao.tipo == TipoRequisicao.CRIAR_ACAO)
-            "Solicitação de Nova Ação"
-          else
-            "Edição de Ação"
+            "Solicitação de Nova Ação" else "Edição de Ação"
           tvPilar.text = "1º Pilar: ${acao.nomePilar}"
           tvNome.text = acao.nome
           tvDescricao.text = acao.descricao
@@ -88,9 +110,7 @@ class DetalheNotificacaoFragment : Fragment() {
         TipoRequisicao.CRIAR_ATIVIDADE, TipoRequisicao.EDITAR_ATIVIDADE -> {
           val atividade = Gson().fromJson(requisicao.atividadeJson, AtividadeJson::class.java)
           tvTituloTopo.text = if (requisicao.tipo == TipoRequisicao.CRIAR_ATIVIDADE)
-            "Solicitação de Nova Atividade"
-          else
-            "Edição de Atividade"
+            "Solicitação de Nova Atividade" else "Edição de Atividade"
           tvPilar.text = "1º Pilar: ${atividade.nomePilar}"
           tvNome.text = atividade.nome
           tvDescricao.text = atividade.descricao
@@ -122,14 +142,16 @@ class DetalheNotificacaoFragment : Fragment() {
           carregarNomesResponsaveis(atividade.responsaveis)
         }
 
-        else -> {}
+        else -> { /* Nenhuma ação definida */ }
       }
 
+      // Botão para aceitar a requisição
       view.findViewById<Button>(R.id.btnAceitar).setOnClickListener {
         viewModel.responderRequisicao(requireContext(), requisicao, true)
         requireActivity().supportFragmentManager.popBackStack()
       }
 
+      // Botão para recusar a requisição
       view.findViewById<Button>(R.id.btnRecusar).setOnClickListener {
         viewModel.responderRequisicao(requireContext(), requisicao, false)
         requireActivity().supportFragmentManager.popBackStack()

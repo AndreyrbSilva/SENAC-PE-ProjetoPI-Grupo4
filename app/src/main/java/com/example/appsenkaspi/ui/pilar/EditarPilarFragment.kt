@@ -26,157 +26,160 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Fragmento responsável por editar um Pilar existente.
+ *
+ * Este fragmento permite a atualização do nome, descrição e data de prazo de um Pilar.
+ * A visibilidade dos botões é controlada de acordo com o cargo do funcionário logado.
+ *
+ * Funcionalidades:
+ * - Carrega os dados do Pilar selecionado.
+ * - Permite edição e confirmação da alteração.
+ * - Oferece opção de exclusão com diálogo de confirmação.
+ * - Integra com ViewModels: PilarViewModel, FuncionarioViewModel e NotificacaoViewModel.
+ */
 class EditarPilarFragment : Fragment() {
 
-    private var _binding: FragmentEditarPilarBinding? = null
-    private val binding get() = _binding!!
+  private var _binding: FragmentEditarPilarBinding? = null
+  private val binding get() = _binding!!
 
-    private val pilarViewModel: PilarViewModel by activityViewModels()
-    private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
+  private val pilarViewModel: PilarViewModel by activityViewModels()
+  private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
+  private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
 
-    private var novaDataSelecionada: Date? = null
-    private var pilarId: Int = -1
+  private var novaDataSelecionada: Date? = null
+  private var pilarId: Int = -1
 
-    private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
+  override fun onCreateView(
+    inflater: LayoutInflater, container: ViewGroup?,
+    savedInstanceState: Bundle?
+  ): View {
+    _binding = FragmentEditarPilarBinding.inflate(inflater, container, false)
+    return binding.root
+  }
 
+  override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    super.onViewCreated(view, savedInstanceState)
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentEditarPilarBinding.inflate(inflater, container, false)
-        return binding.root
-    }
+    configurarBotaoVoltar(view)
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        configurarBotaoVoltar(view)
-
-        funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
-            funcionario?.let {
-                configurarNotificacaoBadge(
-                    rootView = view,
-                    lifecycleOwner = viewLifecycleOwner,
-                    fragmentManager = parentFragmentManager,
-                    funcionarioId = it.id,
-                    cargo = it.cargo,
-                    viewModel = notificacaoViewModel
-                )
-            }
-        }
-
-        funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
-            when (funcionario?.cargo) {
-                Cargo.APOIO -> {
-                    binding.confirmarButtonWrapperEdicao.visibility = View.GONE
-                    binding.iconeMenuEdicao.visibility = View.VISIBLE
-
-                }
-                Cargo.COORDENADOR -> {
-                    binding.confirmarButtonWrapperEdicao.visibility = View.VISIBLE
-                    binding.iconeMenuEdicao.visibility = View.VISIBLE
-                }
-                Cargo.GESTOR -> {
-                    binding.confirmarButtonWrapperEdicao.visibility = View.GONE
-
-                    binding.iconeMenuEdicao.visibility = View.GONE
-                }
-                else -> {
-                    binding.confirmarButtonWrapperEdicao.visibility = View.GONE
-
-                    binding.iconeMenuEdicao.visibility = View.GONE
-                }
-            }
-        }
-
-        binding.buttonPickDateEdicao.setOnClickListener { abrirDatePicker() }
-        binding.confirmarButtonWrapperEdicao.setOnClickListener { confirmarEdicao() }
-
-        binding.iconeMenuEdicao.setOnClickListener { exibirPopupMenu(it) }
-
-        pilarId = arguments?.getInt("pilarId") ?: -1
-        if (pilarId != -1) {
-            carregarDadosPilar(pilarId)
-        } else {
-            Toast.makeText(requireContext(), "Erro ao carregar Pilar!", Toast.LENGTH_SHORT).show()
-            parentFragmentManager.popBackStack()
-        }
-    }
-
-    private fun carregarDadosPilar(id: Int) {
-        lifecycleScope.launch {
-            val dao = AppDatabase.Companion.getDatabase(requireContext()).pilarDao()
-            val pilar = dao.buscarPilarPorId(id)
-            if (pilar != null) {
-                binding.inputNomeEdicao.setText(pilar.nome)
-                binding.inputDescricaoEdicao.setText(pilar.descricao)
-                novaDataSelecionada = pilar.dataPrazo
-                novaDataSelecionada?.let {
-                    val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                    binding.buttonPickDateEdicao.text = formato.format(it)
-                }
-            }
-        }
-    }
-
-    private fun abrirDatePicker() {
-        val calendario = Calendar.getInstance()
-        val datePicker = DatePickerDialog(
-            requireContext(),
-            { _, year, month, dayOfMonth ->
-                calendario.set(year, month, dayOfMonth)
-                novaDataSelecionada = calendario.time
-                val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                binding.buttonPickDateEdicao.text = formato.format(novaDataSelecionada!!)
-            },
-            calendario.get(Calendar.YEAR),
-            calendario.get(Calendar.MONTH),
-            calendario.get(Calendar.DAY_OF_MONTH)
+    // Badge de notificação
+    funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
+      funcionario?.let {
+        configurarNotificacaoBadge(
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = notificacaoViewModel
         )
-        datePicker.show()
+      }
     }
 
-    private fun confirmarEdicao() {
-        val novoNome = binding.inputNomeEdicao.text.toString().trim()
-        val novaDescricao = binding.inputDescricaoEdicao.text.toString().trim()
-
-        if (novoNome.isEmpty()) {
-            binding.inputNomeEdicao.error = "Digite o novo nome do Pilar"
-            return
+    // Controla visibilidade dos botões conforme cargo
+    funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
+      when (funcionario?.cargo) {
+        Cargo.APOIO -> {
+          binding.confirmarButtonWrapperEdicao.visibility = View.GONE
+          binding.iconeMenuEdicao.visibility = View.VISIBLE
         }
-
-        lifecycleScope.launch {
-            val dao = AppDatabase.Companion.getDatabase(requireContext()).pilarDao()
-            val pilarExistente = dao.buscarPilarPorId(pilarId)
-
-            if (pilarExistente != null) {
-                val pilarAtualizado = pilarExistente.copy(
-                    nome = novoNome,
-                    descricao = novaDescricao,
-                    dataPrazo = novaDataSelecionada ?: pilarExistente.dataPrazo
-                )
-                dao.atualizarPilar(pilarAtualizado)
-                Toast.makeText(requireContext(), "Pilar atualizado com sucesso!", Toast.LENGTH_SHORT).show()
-                parentFragmentManager.popBackStack()
-            }
+        Cargo.COORDENADOR -> {
+          binding.confirmarButtonWrapperEdicao.visibility = View.VISIBLE
+          binding.iconeMenuEdicao.visibility = View.VISIBLE
         }
+        Cargo.GESTOR, null -> {
+          binding.confirmarButtonWrapperEdicao.visibility = View.GONE
+          binding.iconeMenuEdicao.visibility = View.GONE
+        }
+      }
     }
 
-  private fun excluirPilar() {
+    binding.buttonPickDateEdicao.setOnClickListener { abrirDatePicker() }
+    binding.confirmarButtonWrapperEdicao.setOnClickListener { confirmarEdicao() }
+    binding.iconeMenuEdicao.setOnClickListener { exibirPopupMenu(it) }
+
+    // Carrega dados do Pilar a partir do ID passado por argumento
+    pilarId = arguments?.getInt("pilarId") ?: -1
+    if (pilarId != -1) {
+      carregarDadosPilar(pilarId)
+    } else {
+      Toast.makeText(requireContext(), "Erro ao carregar Pilar!", Toast.LENGTH_SHORT).show()
+      parentFragmentManager.popBackStack()
+    }
+  }
+
+  /** Carrega os dados do Pilar no formulário. */
+  private fun carregarDadosPilar(id: Int) {
     lifecycleScope.launch {
-      val dao = AppDatabase.Companion.getDatabase(requireContext()).pilarDao()
-      val pilar = dao.buscarPilarPorId(pilarId)
-      if (pilar != null) {
-        pilarViewModel.excluirPilar(pilar) // ← usa a função do ViewModel
-        Toast.makeText(requireContext(), "Pilar excluído com sucesso!", Toast.LENGTH_SHORT).show()
-        parentFragmentManager.popBackStack()
-      } else {
-        Toast.makeText(requireContext(), "Erro ao localizar Pilar!", Toast.LENGTH_SHORT).show()
+      val dao = AppDatabase.getDatabase(requireContext()).pilarDao()
+      dao.buscarPilarPorId(id)?.let { pilar ->
+        binding.inputNomeEdicao.setText(pilar.nome)
+        binding.inputDescricaoEdicao.setText(pilar.descricao)
+        novaDataSelecionada = pilar.dataPrazo
+        binding.buttonPickDateEdicao.text =
+          SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(pilar.dataPrazo)
       }
     }
   }
 
+  /** Abre o seletor de data para definir novo prazo. */
+  private fun abrirDatePicker() {
+    val calendario = Calendar.getInstance()
+    DatePickerDialog(
+      requireContext(),
+      { _, year, month, day ->
+        calendario.set(year, month, day)
+        novaDataSelecionada = calendario.time
+        binding.buttonPickDateEdicao.text =
+          SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(novaDataSelecionada!!)
+      },
+      calendario.get(Calendar.YEAR),
+      calendario.get(Calendar.MONTH),
+      calendario.get(Calendar.DAY_OF_MONTH)
+    ).show()
+  }
 
+  /** Confirma a edição do Pilar e atualiza o banco de dados. */
+  private fun confirmarEdicao() {
+    val novoNome = binding.inputNomeEdicao.text.toString().trim()
+    val novaDescricao = binding.inputDescricaoEdicao.text.toString().trim()
+
+    if (novoNome.isEmpty()) {
+      binding.inputNomeEdicao.error = "Digite o novo nome do Pilar"
+      return
+    }
+
+    lifecycleScope.launch {
+      val dao = AppDatabase.getDatabase(requireContext()).pilarDao()
+      val pilarExistente = dao.buscarPilarPorId(pilarId)
+
+      pilarExistente?.let {
+        val pilarAtualizado = it.copy(
+          nome = novoNome,
+          descricao = novaDescricao,
+          dataPrazo = novaDataSelecionada ?: it.dataPrazo
+        )
+        dao.atualizarPilar(pilarAtualizado)
+        Toast.makeText(requireContext(), "Pilar atualizado com sucesso!", Toast.LENGTH_SHORT).show()
+        parentFragmentManager.popBackStack()
+      }
+    }
+  }
+
+  /** Exclui o Pilar usando o ViewModel. */
+  private fun excluirPilar() {
+    lifecycleScope.launch {
+      val dao = AppDatabase.getDatabase(requireContext()).pilarDao()
+      dao.buscarPilarPorId(pilarId)?.let {
+        pilarViewModel.excluirPilar(it)
+        Toast.makeText(requireContext(), "Pilar excluído com sucesso!", Toast.LENGTH_SHORT).show()
+        parentFragmentManager.popBackStack()
+      } ?: Toast.makeText(requireContext(), "Erro ao localizar Pilar!", Toast.LENGTH_SHORT).show()
+    }
+  }
+
+  /** Exibe caixa de diálogo para confirmar a exclusão do Pilar. */
   private fun exibirDialogoConfirmacao() {
     AlertDialog.Builder(requireContext())
       .setTitle("Confirmar exclusão")
@@ -186,24 +189,24 @@ class EditarPilarFragment : Fragment() {
       .show()
   }
 
-
-    private fun exibirPopupMenu(anchor: View) {
-        val popup = PopupMenu(requireContext(), anchor)
-        popup.menuInflater.inflate(R.menu.menu_pilar, popup.menu)
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                R.id.action_deletar -> {
-                    exibirDialogoConfirmacao()
-                    true
-                }
-                else -> false
-            }
+  /** Exibe menu suspenso com ação de exclusão. */
+  private fun exibirPopupMenu(anchor: View) {
+    PopupMenu(requireContext(), anchor).apply {
+      menuInflater.inflate(R.menu.menu_pilar, menu)
+      setOnMenuItemClickListener {
+        when (it.itemId) {
+          R.id.action_deletar -> {
+            exibirDialogoConfirmacao()
+            true
+          }
+          else -> false
         }
-        popup.show()
-    }
+      }
+    }.show()
+  }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
-    }
+  override fun onDestroyView() {
+    super.onDestroyView()
+    _binding = null
+  }
 }

@@ -29,8 +29,18 @@ import com.example.appsenkaspi.viewmodel.NotificacaoViewModel
 import com.example.appsenkaspi.viewmodel.PilarViewModel
 import kotlinx.coroutines.launch
 
+/**
+ * Fragmento principal da aplicação, exibindo os pilares ativos (planejados ou em andamento).
+ *
+ * Oferece opções de:
+ * - Criação de novos pilares (somente para coordenadores);
+ * - Acesso ao histórico de pilares concluídos, vencidos ou excluídos;
+ * - Abertura de telas específicas conforme a estrutura do pilar (com ou sem subpilares).
+ * Integra animações e observadores de LiveData para atualizações em tempo real.
+ */
 class HomeFragment : Fragment() {
 
+  /** Binding para o layout do fragmento */
   private var _binding: FragmentHomeBinding? = null
   private val binding get() = _binding ?: throw IllegalStateException("Binding is null")
 
@@ -38,16 +48,24 @@ class HomeFragment : Fragment() {
   private lateinit var cardAdicionarPilar: CardView
   private lateinit var adapter: PilarAdapter
 
+  /** ViewModel com dados do funcionário logado */
   private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
+
+  /** ViewModel para gerenciamento dos pilares */
   private val pilarViewModel: PilarViewModel by activityViewModels()
+
+  /** ViewModel para atividades (usado indiretamente por ações futuras) */
   private val atividadeViewModel: AtividadeViewModel by activityViewModels()
+
+  /** ViewModel para notificações e badges */
   private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
 
+  /** ID do funcionário logado no sistema */
   private var funcionarioLogadoId: Int = -1
 
   override fun onCreateView(
-      inflater: LayoutInflater, container: ViewGroup?,
-      savedInstanceState: Bundle?
+    inflater: LayoutInflater, container: ViewGroup?,
+    savedInstanceState: Bundle?
   ): View {
     _binding = FragmentHomeBinding.inflate(inflater, container, false)
     return binding.root
@@ -59,19 +77,21 @@ class HomeFragment : Fragment() {
     val shakeAnim = AnimationUtils.loadAnimation(requireContext(), R.anim.shake)
     val scaleAnim = AnimationUtils.loadAnimation(requireContext(), R.anim.button_scale)
 
+    // Observa o funcionário logado e inicia a lógica de interface com base no cargo
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       funcionario?.let {
         funcionarioLogadoId = it.id
 
-          configurarNotificacaoBadge(
-              rootView = view,
-              lifecycleOwner = viewLifecycleOwner,
-              fragmentManager = parentFragmentManager,
-              funcionarioId = it.id,
-              cargo = it.cargo,
-              viewModel = notificacaoViewModel
-          )
+        configurarNotificacaoBadge(
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = notificacaoViewModel
+        )
 
+        // Exibe botão de adicionar pilar apenas para coordenadores
         binding.cardAdicionarPilar.visibility =
           if (it.cargo == Cargo.COORDENADOR) View.VISIBLE else View.GONE
 
@@ -79,17 +99,19 @@ class HomeFragment : Fragment() {
         cardAdicionarPilar = binding.cardAdicionarPilar
 
         adapter = PilarAdapter(
-            onClickPilar = { pilar -> abrirTelaPilar(pilar) },
-            verificarSubpilares = { pilarId -> pilarViewModel.temSubpilaresDireto(pilarId) }
+          onClickPilar = { pilar -> abrirTelaPilar(pilar) },
+          verificarSubpilares = { pilarId -> pilarViewModel.temSubpilaresDireto(pilarId) }
         )
 
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = adapter
 
+        // Atualiza status dos pilares automaticamente
         lifecycleScope.launch {
           pilarViewModel.atualizarStatusDeTodosOsPilares()
         }
 
+        // Exibe apenas pilares ativos (planejados ou em andamento)
         pilarViewModel.listarTodosPilares().observe(viewLifecycleOwner) { lista ->
           val listaFiltrada = lista.filter {
             it.status == StatusPilar.PLANEJADO || it.status == StatusPilar.EM_ANDAMENTO
@@ -97,7 +119,7 @@ class HomeFragment : Fragment() {
           adapter.submitList(listaFiltrada)
         }
 
-        // Clique curto com animação + navegação
+        // Clique curto: animação e navegação para criação de pilar
         cardAdicionarPilar.setOnClickListener {
           it.startAnimation(scaleAnim)
           it.postDelayed({
@@ -119,14 +141,14 @@ class HomeFragment : Fragment() {
           }, 200)
         }
 
-        // Clique longo: shake + scale
+        // Clique longo: efeito shake + scale
         cardAdicionarPilar.setOnLongClickListener {
           it.startAnimation(shakeAnim)
           it.startAnimation(scaleAnim)
           true
         }
 
-        // Botão de histórico com animação
+        // Botão para acessar o histórico de pilares
         val boxHistorico = view.findViewById<View>(R.id.box_historico)
         boxHistorico.setOnClickListener {
           val historicoFragment = HistoricoFragment()
@@ -142,12 +164,18 @@ class HomeFragment : Fragment() {
             .commit()
         }
 
+        // Define cor da status bar do app
         requireActivity().window.statusBarColor =
           ContextCompat.getColor(requireContext(), R.color.graybar)
       }
     }
   }
 
+  /**
+   * Abre a tela associada a um pilar, com ou sem subpilares.
+   *
+   * @param pilar Pilar selecionado pelo usuário.
+   */
   private fun abrirTelaPilar(pilar: PilarEntity) {
     viewLifecycleOwner.lifecycleScope.launch {
       val temSubpilares = pilarViewModel.temSubpilares(pilar.id)

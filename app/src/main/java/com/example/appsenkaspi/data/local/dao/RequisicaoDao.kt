@@ -10,30 +10,44 @@ import com.example.appsenkaspi.data.local.entity.RequisicaoEntity
 import com.example.appsenkaspi.data.local.enums.StatusRequisicao
 import com.example.appsenkaspi.data.local.enums.TipoRequisicao
 
+/**
+ * DAO responsável pelas operações relacionadas às requisições no sistema.
+ * Inclui inserções, atualizações, buscas, verificações e exclusões associadas a diferentes tipos de notificações e ações pendentes.
+ */
 @Dao
 interface RequisicaoDao {
 
-  // ✅ Inserção única com substituição em conflito
-  @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
+  /**
+   * Insere uma nova requisição no banco. Substitui caso já exista uma com o mesmo ID.
+   */
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun inserir(requisicao: RequisicaoEntity): Long
 
-
-
+  /**
+   * Atualiza uma requisição existente.
+   */
   @Update
   suspend fun update(requisicao: RequisicaoEntity)
 
-  // ✅ Requisições pendentes para coordenador (sem incluir notificações informativas)
+  /**
+   * Retorna todas as requisições pendentes de aprovação que não sejam informativas.
+   */
   @Query("""
-    SELECT * FROM requisicoes
-    WHERE status = :status
-    AND tipo != 'atividade_para_vencer' -- ← Essa linha já existe, confirme se está ativa
-""")
+        SELECT * FROM requisicoes
+        WHERE status = :status
+        AND tipo != 'atividade_para_vencer'
+    """)
   fun getRequisicoesPendentes(status: StatusRequisicao = StatusRequisicao.PENDENTE): LiveData<List<RequisicaoEntity>>
 
-
+  /**
+   * Busca uma requisição específica pelo ID.
+   */
   @Query("SELECT * FROM requisicoes WHERE id = :id")
   suspend fun getRequisicaoById(id: Int): RequisicaoEntity?
 
+  /**
+   * Retorna todas as requisições feitas por um usuário, ordenadas por data.
+   */
   @Query("""
         SELECT * FROM requisicoes
         WHERE solicitanteId = :userId
@@ -41,6 +55,9 @@ interface RequisicaoDao {
     """)
   fun getRequisicoesDoUsuario(userId: Int): LiveData<List<RequisicaoEntity>>
 
+  /**
+   * Retorna as notificações visíveis no painel do apoio (idêntico à anterior).
+   */
   @Query("""
         SELECT * FROM requisicoes
         WHERE solicitanteId = :usuarioId
@@ -48,7 +65,9 @@ interface RequisicaoDao {
     """)
   fun getNotificacoesDoApoio(usuarioId: Int): LiveData<List<RequisicaoEntity>>
 
-  // ✅ Verifica se existe uma requisição pendente para um usuário específico
+  /**
+   * Verifica se existe uma requisição pendente para uma atividade, usuário e tipo específico.
+   */
   @Query("""
         SELECT * FROM requisicoes
         WHERE atividadeId = :atividadeId
@@ -63,17 +82,19 @@ interface RequisicaoDao {
     tipo: TipoRequisicao
   ): RequisicaoEntity?
 
-  // ✅ Contagem para badge (apenas notificações de ação, se quiser incluir tudo, remova o filtro)
+  /**
+   * Retorna a quantidade de requisições não vistas por um usuário.
+   */
   @Query("""
-    SELECT COUNT(*) FROM requisicoes
-    WHERE solicitanteId = :userId
-    AND foiVista = 0
-""")
+        SELECT COUNT(*) FROM requisicoes
+        WHERE solicitanteId = :userId
+        AND foiVista = 0
+    """)
   fun getQuantidadeNaoVistas(userId: Int): LiveData<Int>
 
-
-
-  // ✅ Marca todas como vistas
+  /**
+   * Marca todas as notificações como vistas para um usuário.
+   */
   @Query("""
         UPDATE requisicoes
         SET foiVista = 1
@@ -82,7 +103,9 @@ interface RequisicaoDao {
     """)
   suspend fun marcarComoVista(usuarioId: Int)
 
-  // ✅ Lista não vistas completas
+  /**
+   * Retorna a lista de notificações não vistas para o painel de apoio.
+   */
   @Query("""
         SELECT * FROM requisicoes
         WHERE solicitanteId = :usuarioId
@@ -90,7 +113,9 @@ interface RequisicaoDao {
     """)
   fun getNotificacoesNaoVistas(usuarioId: Int): LiveData<List<RequisicaoEntity>>
 
-  // ✅ Checa existência específica de notificação (por pessoa e tipo)
+  /**
+   * Verifica se há requisição pendente específica para uma atividade, usuário e tipo.
+   */
   @Query("""
         SELECT EXISTS(
             SELECT 1 FROM requisicoes
@@ -106,135 +131,181 @@ interface RequisicaoDao {
     tipo: TipoRequisicao
   ): Boolean
 
-
+  /**
+   * Verifica se já foi feita uma requisição hoje para a atividade.
+   */
   @Query("""
-    SELECT EXISTS(
-        SELECT 1 FROM requisicoes
-        WHERE atividadeId = :atividadeId
-        AND solicitanteId = :solicitanteId
-        AND tipo = :tipo
-        AND date(datetime(dataSolicitacao / 1000, 'unixepoch')) = date('now')
-    )
-""")
+        SELECT EXISTS(
+            SELECT 1 FROM requisicoes
+            WHERE atividadeId = :atividadeId
+            AND solicitanteId = :solicitanteId
+            AND tipo = :tipo
+            AND date(datetime(dataSolicitacao / 1000, 'unixepoch')) = date('now')
+        )
+    """)
   suspend fun existeRequisicaoHojeParaAtividade(
     atividadeId: Int,
     solicitanteId: Int,
     tipo: TipoRequisicao
   ): Boolean
 
+  /**
+   * Conta requisições pendentes que exigem decisão do coordenador.
+   */
   @Query("""
-    SELECT COUNT(*) FROM requisicoes
-    WHERE status = 'pendente'
-    AND tipo IN ('criar_atividade', 'editar_atividade', 'criar_acao', 'editar_acao', 'completar_atividade')
-""")
+        SELECT COUNT(*) FROM requisicoes
+        WHERE status = 'pendente'
+        AND tipo IN ('criar_atividade', 'editar_atividade', 'criar_acao', 'editar_acao', 'completar_atividade')
+    """)
   fun getQuantidadePendentesParaCoordenador(): LiveData<Int>
 
+  /**
+   * Retorna quantidade de notificações de prazo não vistas.
+   */
   @Query("""
-    SELECT COUNT(*) FROM requisicoes
-    WHERE solicitanteId = :userId
-    AND foiVista = 0
-    AND tipo IN ('atividade_para_vencer', 'atividade_vencida', 'prazo_alterado', 'atividade_concluida', 'responsavel_adicionado', 'responsavel_removido')
-""")
+        SELECT COUNT(*) FROM requisicoes
+        WHERE solicitanteId = :userId
+        AND foiVista = 0
+        AND tipo IN ('atividade_para_vencer', 'atividade_vencida', 'prazo_alterado', 'atividade_concluida', 'responsavel_adicionado', 'responsavel_removido')
+    """)
   fun getQuantidadeNotificacoesPrazoNaoVistas(userId: Int): LiveData<Int>
 
+  /**
+   * Marca todas as notificações de prazo como vistas.
+   */
   @Query("""
-    UPDATE requisicoes
-    SET foiVista = 1
-    WHERE solicitanteId = :usuarioId
-    AND foiVista = 0
-    AND tipo in ('atividade_para_vencer', 'atividade_vencida', 'prazo_alterado', 'atividade_concluida', 'responsavel_adicionado', 'responsavel_removido')
-""")
+        UPDATE requisicoes
+        SET foiVista = 1
+        WHERE solicitanteId = :usuarioId
+        AND foiVista = 0
+        AND tipo in ('atividade_para_vencer', 'atividade_vencida', 'prazo_alterado', 'atividade_concluida', 'responsavel_adicionado', 'responsavel_removido')
+    """)
   suspend fun marcarNotificacoesDePrazoComoVistas(usuarioId: Int)
 
+  /**
+   * Verifica se existe notificação de atividade vencida para o responsável.
+   */
   @Query("""
-  SELECT EXISTS (
-    SELECT 1 FROM requisicoes
-    WHERE atividadeId = :atividadeId
-    AND solicitanteId = :solicitanteId
-    AND tipo = 'atividade_vencida'
-  )
-""")
+        SELECT EXISTS (
+            SELECT 1 FROM requisicoes
+            WHERE atividadeId = :atividadeId
+            AND solicitanteId = :responsavelId
+            AND tipo = 'atividade_vencida'
+        )
+    """)
   suspend fun existeRequisicaoDeVencida(
     atividadeId: Int,
-    solicitanteId: Int
+    responsavelId: Int
   ): Boolean
 
+  /**
+   * Busca notificações de tipo prazo por atividade.
+   */
   @Query("SELECT * FROM requisicoes WHERE atividadeId = :atividadeId AND (tipo = 'atividade_para_vencer' OR tipo = 'atividade_vencidade')")
   suspend fun getRequisicoesDePrazoPorAtividade(atividadeId: Int): List<RequisicaoEntity>
+
+  /**
+   * Marca requisição como oculta (foiVista = 1).
+   */
   @Query("""
-      UPDATE requisicoes
-      SET foiVista = 1
-      WHERE id = :requisicaoId
+        UPDATE requisicoes
+        SET foiVista = 1
+        WHERE id = :requisicaoId
     """)
   suspend fun marcarComoOculta(requisicaoId: Int)
 
+  /**
+   * Marca requisição como resolvida.
+   */
   @Query("UPDATE requisicoes SET resolvida = 1 WHERE id = :requisicaoId")
   suspend fun marcarComoResolvida(requisicaoId: Int)
 
+  /**
+   * Deleta requisições de prazo específicas por tipo.
+   */
   @Query("DELETE FROM requisicoes WHERE atividadeId = :atividadeId AND tipo = :tipo")
   suspend fun deletarRequisicoesDePrazoPorAtividade(
     atividadeId: Int,
     tipo: TipoRequisicao = TipoRequisicao.ATIVIDADE_PARA_VENCER
   )
+
+  /**
+   * Deleta requisições de um determinado tipo por atividade.
+   */
   @Query("DELETE FROM requisicoes WHERE atividadeId = :atividadeId AND tipo = :tipo")
   suspend fun deletarRequisicoesDeTipoPorAtividade(
     atividadeId: Int,
     tipo: TipoRequisicao
   )
+
+  /**
+   * Retorna todas as notificações de um funcionário ordenadas pela data.
+   */
   @Query("SELECT * FROM requisicoes WHERE solicitanteId = :id ORDER BY dataSolicitacao DESC")
   fun getNotificacoesDoFuncionario(id: Int): LiveData<List<RequisicaoEntity>>
 
+  /**
+   * Verifica se há notificação com dias restantes já enviada.
+   */
   @Query("""
-  SELECT COUNT(*) > 0 FROM requisicoes
-  WHERE atividadeId = :atividadeId
-    AND solicitanteId = :responsavelId
-    AND tipo = :tipo
-    AND mensagemResposta LIKE '%' || :diasRestantes || '%'
-""")
+        SELECT COUNT(*) > 0 FROM requisicoes
+        WHERE atividadeId = :atividadeId
+        AND solicitanteId = :responsavelId
+        AND tipo = :tipo
+        AND mensagemResposta LIKE '%' || :diasRestantes || '%'
+    """)
   suspend fun existeNotificacaoComDiasRestantes(
-      atividadeId: Int,
-      responsavelId: Int,
-      tipo: TipoRequisicao,
-      diasRestantes: Int
+    atividadeId: Int,
+    responsavelId: Int,
+    tipo: TipoRequisicao,
+    diasRestantes: Int
   ): Boolean
 
+  /**
+   * Verifica se há notificação com mensagem exatamente igual à enviada.
+   */
   @Query("""
-  SELECT EXISTS(
-    SELECT 1 FROM requisicoes
-    WHERE atividadeId = :atividadeId
-    AND solicitanteId = :responsavelId
-    AND tipo = :tipo
-    AND mensagemResposta = :mensagem
-  )
-""")
+        SELECT EXISTS(
+            SELECT 1 FROM requisicoes
+            WHERE atividadeId = :atividadeId
+            AND solicitanteId = :responsavelId
+            AND tipo = :tipo
+            AND mensagemResposta = :mensagem
+        )
+    """)
   suspend fun existeMensagemExata(
-      atividadeId: Int,
-      responsavelId: Int,
-      tipo: TipoRequisicao,
-      mensagem: String
+    atividadeId: Int,
+    responsavelId: Int,
+    tipo: TipoRequisicao,
+    mensagem: String
   ): Boolean
 
-
-
+  /**
+   * Retorna todas as requisições ordenadas por data.
+   */
   @Query("SELECT * FROM requisicoes ORDER BY dataSolicitacao DESC")
   fun getTodasNotificacoes(): LiveData<List<RequisicaoEntity>>
 
-  @Query("""
-  DELETE FROM requisicoes
-  WHERE atividadeId = :atividadeId AND tipo = :tipo AND solicitanteId = :responsavelId
-""")
+  /**
+   * Remove requisições específicas por tipo, atividade e funcionário.
+   */
+  @Query("DELETE FROM requisicoes WHERE atividadeId = :atividadeId AND tipo = :tipo AND solicitanteId = :responsavelId")
   suspend fun deletarRequisicoesDeTipoPorAtividadeEFuncionario(
-      atividadeId: Int,
-      tipo: TipoRequisicao,
-      responsavelId: Int
+    atividadeId: Int,
+    tipo: TipoRequisicao,
+    responsavelId: Int
   )
 
+  /**
+   * Marca requisições como excluídas (soft delete).
+   */
   @Query("UPDATE requisicoes SET excluida = 1 WHERE id IN (:ids)")
   suspend fun marcarComoExcluidas(ids: List<Int>)
 
-
+  /**
+   * Retorna requisições que não foram excluídas.
+   */
   @Query("SELECT * FROM requisicoes WHERE excluida = 0")
   fun getNaoExcluidas(): LiveData<List<RequisicaoEntity>>
-
-
 }
+

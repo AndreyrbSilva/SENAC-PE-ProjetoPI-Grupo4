@@ -35,27 +35,52 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Fragmento responsável por permitir a criação de uma nova Ação, vinculada a um Pilar ou Subpilar.
+ * Este fragmento trata tanto da lógica de criação direta (Coordenador) quanto da geração de requisição (Apoio).
+ */
 class CriarAcaoFragment : Fragment() {
 
+  // ViewBinding do fragmento
   private var _binding: FragmentCriarAcaoBinding? = null
   private val binding get() = _binding!!
 
+  /** ViewModel principal da Ação */
   private val acaoViewModel: AcaoViewModel by activityViewModels()
+
+  /** ViewModel responsável pelo relacionamento Ação-Funcionário */
   private val acaoFuncionarioViewModel: AcaoFuncionarioViewModel by activityViewModels()
+
+  /** ViewModel do Funcionário logado e dados de funcionários */
   private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
+
+  /** ViewModel de notificações e requisições */
   private val requisicaoViewModel: NotificacaoViewModel by activityViewModels()
 
+  /** Armazena a data de prazo selecionada pelo usuário */
   private var dataPrazoSelecionada: Date? = null
+
+  /** Instância de calendário utilizada pelo DatePicker */
   private val calendario = Calendar.getInstance()
+
+  /** Identificador do Subpilar (caso ação esteja vinculada a um) */
   private var subpilarId: Int? = null
+
+  /** Identificador do Pilar (caso ação esteja vinculada a um) */
   private var pilarId: Int? = null
+
+  /** Lista de funcionários responsáveis selecionados para a ação */
   private val funcionariosSelecionados = mutableListOf<FuncionarioEntity>()
+
+  /** Adaptador que exibe os responsáveis selecionados */
   private lateinit var adapterSelecionados: FuncionarioSelecionadoAdapter
+
+  /** Alias para o ViewModel de notificação para uso genérico */
   private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
 
   override fun onCreateView(
-      inflater: LayoutInflater, container: ViewGroup?,
-      savedInstanceState: Bundle?
+    inflater: LayoutInflater, container: ViewGroup?,
+    savedInstanceState: Bundle?
   ): View {
     _binding = FragmentCriarAcaoBinding.inflate(inflater, container, false)
     return binding.root
@@ -65,20 +90,21 @@ class CriarAcaoFragment : Fragment() {
     super.onViewCreated(view, savedInstanceState)
     configurarBotaoVoltar(view)
 
+    // Observa e configura o badge de notificação para o funcionário logado
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       funcionario?.let {
-          configurarNotificacaoBadge(
-              rootView = view,
-              lifecycleOwner = viewLifecycleOwner,
-              fragmentManager = parentFragmentManager,
-              funcionarioId = it.id,
-              cargo = it.cargo,
-              viewModel = notificacaoViewModel
-          )
+        configurarNotificacaoBadge(
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = notificacaoViewModel
+        )
       }
     }
 
-    // Recuperar IDs passados por argumento
+    // Recupera argumentos de Pilar/Subpilar
     pilarId = arguments?.getInt("pilarId")?.takeIf { it > 0 }
     subpilarId = arguments?.getInt("subpilarId")?.takeIf { it > 0 }
 
@@ -88,6 +114,7 @@ class CriarAcaoFragment : Fragment() {
       return
     }
 
+    // Alterna botões conforme cargo
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       when (funcionario?.cargo) {
         Cargo.APOIO -> {
@@ -105,16 +132,21 @@ class CriarAcaoFragment : Fragment() {
       }
     }
 
+    // Inicializa RecyclerView para exibir os funcionários responsáveis
     adapterSelecionados = FuncionarioSelecionadoAdapter(funcionariosSelecionados)
     binding.recyclerViewFuncionariosSelecionados.layoutManager =
-        LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+      LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
     binding.recyclerViewFuncionariosSelecionados.adapter = adapterSelecionados
 
+    // Abertura do seletor de data
     binding.buttonPickDateAcao.setOnClickListener { abrirDatePicker() }
+
+    // Abre diálogo para seleção de responsáveis
     binding.iconSelecionarFuncionario.setOnClickListener {
       SelecionarResponsavelDialogFragment().show(childFragmentManager, "SelecionarFuncionariosDialog")
     }
 
+    // Caso o usuário for Apoio, envia requisição
     binding.buttonPedirConfirmacaoAcao.setOnClickListener {
       val nome = binding.inputNomeAcao.text.toString().trim()
       val descricao = binding.inputDescricaoAcao.text.toString().trim()
@@ -127,6 +159,7 @@ class CriarAcaoFragment : Fragment() {
 
       viewLifecycleOwner.lifecycleScope.launch {
         if (!validarPrazoAcao()) return@launch
+
         val nomeEstrutura = when {
           subpilarId != null -> acaoViewModel.buscarNomeSubpilarPorId(subpilarId!!) ?: "Subpilar"
           pilarId != null -> acaoViewModel.buscarPilarPorId(pilarId!!)?.nome ?: "Pilar"
@@ -147,23 +180,22 @@ class CriarAcaoFragment : Fragment() {
           responsaveis = funcionariosSelecionados.map { it.id }
         )
 
-        val json = Gson().toJson(acaoJson)
-
         val requisicao = RequisicaoEntity(
-            tipo = TipoRequisicao.CRIAR_ACAO,
-            acaoJson = json,
-            status = StatusRequisicao.PENDENTE,
-            solicitanteId = funcionarioLogado.id,
-            dataSolicitacao = Date()
+          tipo = TipoRequisicao.CRIAR_ACAO,
+          acaoJson = Gson().toJson(acaoJson),
+          status = StatusRequisicao.PENDENTE,
+          solicitanteId = funcionarioLogado.id,
+          dataSolicitacao = Date()
         )
 
-        AppDatabase.Companion.getDatabase(requireContext()).requisicaoDao().inserir(requisicao)
+        AppDatabase.getDatabase(requireContext()).requisicaoDao().inserir(requisicao)
 
         Toast.makeText(requireContext(), "Requisição de ação enviada para aprovação!", Toast.LENGTH_SHORT).show()
         parentFragmentManager.popBackStack()
       }
     }
 
+    // Coordenador cria a ação diretamente
     binding.buttonConfirmacaoAcao.setOnClickListener {
       viewLifecycleOwner.lifecycleScope.launch {
         if (!validarPrazoAcao()) return@launch
@@ -171,7 +203,7 @@ class CriarAcaoFragment : Fragment() {
       }
     }
 
-
+    // Recebe funcionários selecionados no diálogo
     childFragmentManager.setFragmentResultListener("funcionariosSelecionados", viewLifecycleOwner) { _, bundle ->
       val lista = bundle.getParcelableArrayList<FuncionarioEntity>("listaFuncionarios") ?: arrayListOf()
       funcionariosSelecionados.clear()
@@ -180,21 +212,28 @@ class CriarAcaoFragment : Fragment() {
     }
   }
 
+  /**
+   * Exibe um DatePicker e atualiza o campo com a data selecionada.
+   */
   private fun abrirDatePicker() {
     DatePickerDialog(
-        requireContext(),
-        { _, ano, mes, dia ->
-            calendario.set(ano, mes, dia)
-            dataPrazoSelecionada = calendario.time
-            val fmt = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-            binding.buttonPickDateAcao.text = fmt.format(dataPrazoSelecionada!!)
-        },
-        calendario.get(Calendar.YEAR),
-        calendario.get(Calendar.MONTH),
-        calendario.get(Calendar.DAY_OF_MONTH)
+      requireContext(),
+      { _, ano, mes, dia ->
+        calendario.set(ano, mes, dia)
+        dataPrazoSelecionada = calendario.time
+        val fmt = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        binding.buttonPickDateAcao.text = fmt.format(dataPrazoSelecionada!!)
+      },
+      calendario.get(Calendar.YEAR),
+      calendario.get(Calendar.MONTH),
+      calendario.get(Calendar.DAY_OF_MONTH)
     ).show()
   }
 
+  /**
+   * Confirma diretamente a criação de uma nova Ação no banco de dados local.
+   * Disponível apenas para Coordenadores.
+   */
   private fun confirmarCriacaoAcao() {
     val nome = binding.inputNomeAcao.text.toString().trim()
     val descricao = binding.inputDescricaoAcao.text.toString().trim()
@@ -223,25 +262,26 @@ class CriarAcaoFragment : Fragment() {
     viewLifecycleOwner.lifecycleScope.launch {
       try {
         val idNovaAcao = acaoViewModel.criarAcaoSegura(
-            AcaoEntity(
-                nome = nome,
-                descricao = descricao,
-                dataInicio = Date(),
-                dataPrazo = dataPrazoSelecionada!!,
-                pilarId = if (subpilarId == null) pilarId else null,
-                subpilarId = subpilarId,
-                status = StatusAcao.PLANEJADA,
-                criadoPor = funcionarioLogado.id,
-                dataCriacao = Date()
-            )
+          AcaoEntity(
+            nome = nome,
+            descricao = descricao,
+            dataInicio = Date(),
+            dataPrazo = dataPrazoSelecionada!!,
+            pilarId = if (subpilarId == null) pilarId else null,
+            subpilarId = subpilarId,
+            status = StatusAcao.PLANEJADA,
+            criadoPor = funcionarioLogado.id,
+            dataCriacao = Date()
+          )
         )
 
+        // Relaciona funcionários à nova ação
         funcionariosSelecionados.forEach { func ->
           acaoFuncionarioViewModel.inserir(
-              AcaoFuncionarioEntity(
-                  acaoId = idNovaAcao,
-                  funcionarioId = func.id
-              )
+            AcaoFuncionarioEntity(
+              acaoId = idNovaAcao,
+              funcionarioId = func.id
+            )
           )
         }
 
@@ -252,6 +292,11 @@ class CriarAcaoFragment : Fragment() {
       }
     }
   }
+
+  /**
+   * Valida se a data de prazo selecionada está dentro dos limites do Pilar/Subpilar.
+   * @return true se a data for válida, false caso contrário.
+   */
   private suspend fun validarPrazoAcao(): Boolean {
     if (dataPrazoSelecionada == null) {
       binding.buttonPickDateAcao.error = "Selecione uma data de prazo"
@@ -283,6 +328,9 @@ class CriarAcaoFragment : Fragment() {
     return true
   }
 
+  /**
+   * Remove horas, minutos e segundos de uma data, para comparação apenas por dia.
+   */
   private fun truncarData(data: Date): Date {
     val cal = Calendar.getInstance()
     cal.time = data
@@ -293,9 +341,12 @@ class CriarAcaoFragment : Fragment() {
     return cal.time
   }
 
-
-
   companion object {
+    /**
+     * Cria uma nova instância do fragmento, associada a um Pilar ou Subpilar.
+     * @param pilarId ID do Pilar (opcional)
+     * @param subpilarId ID do Subpilar (opcional)
+     */
     fun newInstance(pilarId: Int? = null, subpilarId: Int? = null): CriarAcaoFragment {
       return CriarAcaoFragment().apply {
         arguments = Bundle().apply {

@@ -14,62 +14,81 @@ import com.example.appsenkaspi.databinding.DialogEscolherResponsaveisBinding
 import com.example.appsenkaspi.ui.responsaveis.ResponsavelAdapter
 import com.example.appsenkaspi.viewmodel.FuncionarioViewModel
 
+/**
+ * Diálogo que permite selecionar múltiplos responsáveis a partir da lista de funcionários disponíveis.
+ *
+ * Os responsáveis selecionados são retornados ao fragmento pai via `setFragmentResult` com a chave "funcionariosSelecionados".
+ * Utiliza um `ResponsavelAdapter` customizado com suporte à seleção múltipla.
+ */
 class SelecionarResponsavelDialogFragment : DialogFragment() {
 
-    private var _binding: DialogEscolherResponsaveisBinding? = null
-    private val binding get() = _binding!!
+  /** Binding do layout do diálogo */
+  private var _binding: DialogEscolherResponsaveisBinding? = null
+  private val binding get() = _binding!!
 
-    private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
-    private val selecionados = mutableListOf<FuncionarioEntity>()
-    private lateinit var adapter: ResponsavelAdapter
+  /** ViewModel compartilhado contendo a lista de funcionários */
+  private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = DialogEscolherResponsaveisBinding.inflate(inflater, container, false)
-        return binding.root
+  /** Lista de funcionários selecionados durante a interação */
+  private val selecionados = mutableListOf<FuncionarioEntity>()
+
+  /** Adapter responsável por exibir e gerenciar a seleção dos funcionários */
+  private lateinit var adapter: ResponsavelAdapter
+
+  override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    _binding = DialogEscolherResponsaveisBinding.inflate(inflater, container, false)
+    return binding.root
+  }
+
+  override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    super.onViewCreated(view, savedInstanceState)
+
+    // Inicializa o adapter com lista vazia e com suporte à seleção múltipla
+    adapter = ResponsavelAdapter(
+      funcionarios = listOf(),
+      selecionados = selecionados,
+      onSelecionadosAtualizados = { listaAtualizada ->
+        // Callback opcional caso deseje tratar mudanças
+      }
+    )
+
+    binding.recyclerMembros.layoutManager = LinearLayoutManager(requireContext())
+    binding.recyclerMembros.adapter = adapter
+
+    // Observa e atualiza a lista de funcionários no adapter
+    funcionarioViewModel.listasFuncionarios.observe(viewLifecycleOwner) { lista ->
+      adapter.atualizarLista(lista)
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        // ✅ Inicialize o adapter primeiro
-        adapter = ResponsavelAdapter(
-            funcionarios = listOf(), // inicial vazio
-            selecionados = selecionados,
-            onSelecionadosAtualizados = { listaAtualizada ->
-                // Aqui você pode atualizar UI ou estado se quiser
-            }
-        )
-
-        binding.recyclerMembros.layoutManager = LinearLayoutManager(requireContext())
-        binding.recyclerMembros.adapter = adapter
-
-        // ✅ Agora é seguro observar e usar o adapter
-        funcionarioViewModel.listasFuncionarios.observe(viewLifecycleOwner) { lista ->
-            adapter.atualizarLista(lista)
-        }
-
-        binding.fecharDialog.setOnClickListener {
-            dismiss()
-        }
-
-        binding.buttonConfirmarSelecionados.setOnClickListener {
-            val result = Bundle().apply {
-                putParcelableArrayList("listaFuncionarios", ArrayList(selecionados))
-            }
-            parentFragmentManager.setFragmentResult("funcionariosSelecionados", result)
-            dismiss()
-        }
+    // Fecha o diálogo ao clicar no botão "Fechar"
+    binding.fecharDialog.setOnClickListener {
+      dismiss()
     }
 
-
-    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        val dialog = super.onCreateDialog(savedInstanceState)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        return dialog
+    // Retorna os selecionados ao fragmento pai ao clicar em "Confirmar"
+    binding.buttonConfirmarSelecionados.setOnClickListener {
+      val result = Bundle().apply {
+        putParcelableArrayList("listaFuncionarios", ArrayList(selecionados))
+      }
+      parentFragmentManager.setFragmentResult("funcionariosSelecionados", result)
+      dismiss()
     }
+  }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
-    }
+  /**
+   * Remove a barra de título padrão do diálogo.
+   */
+  override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+    val dialog = super.onCreateDialog(savedInstanceState)
+    dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+    return dialog
+  }
+
+  /**
+   * Libera o binding para evitar memory leaks.
+   */
+  override fun onDestroyView() {
+    super.onDestroyView()
+    _binding = null
+  }
 }
