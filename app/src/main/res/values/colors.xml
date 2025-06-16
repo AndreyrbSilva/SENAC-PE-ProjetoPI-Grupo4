@@ -46,5 +46,10 @@
         <!-- Adicionados -->
         <color name="azulEscuro">#133A5E</color>
         <color name="azulClaro">#1E5B9A</color>
+        <color name="purple_700">#3700B3</color>
+        <color name="teal_700">#018786</color>
+        <color name="dim_black">#AA000000</color>
+        <color name="pulseColor">#FFFFFF</color>
+
 
 </resources>

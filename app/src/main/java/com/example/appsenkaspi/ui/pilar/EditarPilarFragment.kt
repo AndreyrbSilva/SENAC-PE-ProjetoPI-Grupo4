@@ -8,6 +8,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
 import android.widget.Toast
+import android.graphics.Color
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -177,14 +179,28 @@ class EditarPilarFragment : Fragment() {
   }
 
 
-  private fun exibirDialogoConfirmacao() {
-    AlertDialog.Builder(requireContext())
-      .setTitle("Confirmar exclusão")
-      .setMessage("Deseja excluir este Pilar?")
-      .setPositiveButton("Excluir") { _, _ -> excluirPilar() }
-      .setNegativeButton("Cancelar", null)
-      .show()
-  }
+    private fun exibirDialogoConfirmacao() {
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Confirmar exclusão")
+            .setMessage("Deseja excluir este Pilar?")
+            .setPositiveButton("Excluir") { _, _ -> excluirPilar() }
+            .setNegativeButton("Cancelar", null)
+            .create()
+
+        dialog.show()
+
+        // Aplica background customizado
+        dialog.window?.setBackgroundDrawableResource(R.drawable.dialog_background)
+
+        // Ajusta largura
+        val width = (resources.displayMetrics.widthPixels * 0.85).toInt()
+        dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+        (dialog.findViewById<TextView>(android.R.id.message))?.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
+    }
 
 
     private fun exibirPopupMenu(anchor: View) {

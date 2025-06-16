@@ -57,8 +57,8 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.4.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.5.2")
-
-
+    implementation("com.getkeepsafe.taptargetview:taptargetview:1.13.3")
+    implementation("androidx.core:core-splashscreen:1.0.0")
 
     // Room
     implementation(libs.room.runtime)

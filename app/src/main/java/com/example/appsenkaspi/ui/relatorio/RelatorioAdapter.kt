@@ -139,15 +139,26 @@ class RelatorioAdapter(
         }
 
         dialogBinding.txtApagar.setOnClickListener {
-            AlertDialog.Builder(view.context)
+            val dialog = AlertDialog.Builder(view.context)
                 .setTitle("Confirmar exclusão")
                 .setMessage("Deseja realmente apagar este item do histórico?")
                 .setPositiveButton("Sim") { _, _ ->
                     removerItem(position) // remove e atualiza storage
-                    dialog.dismiss()
                 }
                 .setNegativeButton("Cancelar", null)
-                .show()
+                .create()
+
+            dialog.show()
+
+            dialog.window?.setBackgroundDrawableResource(R.drawable.dialog_background)
+
+            val width = (view.context.resources.displayMetrics.widthPixels * 0.85).toInt()
+            dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+            dialog.findViewById<TextView>(android.R.id.message)?.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
         }
 
         dialog.show()

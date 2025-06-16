@@ -46,8 +46,8 @@ class HomeFragment : Fragment() {
   private var funcionarioLogadoId: Int = -1
 
   override fun onCreateView(
-      inflater: LayoutInflater, container: ViewGroup?,
-      savedInstanceState: Bundle?
+    inflater: LayoutInflater, container: ViewGroup?,
+    savedInstanceState: Bundle?
   ): View {
     _binding = FragmentHomeBinding.inflate(inflater, container, false)
     return binding.root
@@ -63,14 +63,14 @@ class HomeFragment : Fragment() {
       funcionario?.let {
         funcionarioLogadoId = it.id
 
-          configurarNotificacaoBadge(
-              rootView = view,
-              lifecycleOwner = viewLifecycleOwner,
-              fragmentManager = parentFragmentManager,
-              funcionarioId = it.id,
-              cargo = it.cargo,
-              viewModel = notificacaoViewModel
-          )
+        configurarNotificacaoBadge(
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = notificacaoViewModel
+        )
 
         binding.cardAdicionarPilar.visibility =
           if (it.cargo == Cargo.COORDENADOR) View.VISIBLE else View.GONE
@@ -79,8 +79,8 @@ class HomeFragment : Fragment() {
         cardAdicionarPilar = binding.cardAdicionarPilar
 
         adapter = PilarAdapter(
-            onClickPilar = { pilar -> abrirTelaPilar(pilar) },
-            verificarSubpilares = { pilarId -> pilarViewModel.temSubpilaresDireto(pilarId) }
+          onClickPilar = { pilar -> abrirTelaPilar(pilar) },
+          verificarSubpilares = { pilarId -> pilarViewModel.temSubpilaresDireto(pilarId) }
         )
 
         recyclerView.layoutManager = LinearLayoutManager(requireContext())

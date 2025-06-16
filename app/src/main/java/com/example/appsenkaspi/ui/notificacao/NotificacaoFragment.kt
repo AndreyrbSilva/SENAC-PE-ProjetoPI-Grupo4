@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.Fragment
+import android.graphics.Color
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -143,10 +144,10 @@ class NotificacaoFragment : Fragment() {
           atualizarIconeLixeira()
         } else {
           if (adapter.selecionadas.isNotEmpty()) {
-            AlertDialog.Builder(requireContext())
+            val dialog = AlertDialog.Builder(requireContext())
               .setTitle("Excluir notificações")
               .setMessage("Tem certeza que deseja excluir ${adapter.selecionadas.size} notificações selecionadas?")
-              .setPositiveButton("Excluir") { dialog, _ ->
+              .setPositiveButton("Excluir") { dialogInterface, _ ->
                 viewModel.excluirRequisicoes(adapter.selecionadas.toList())
                 Snackbar.make(view, "Notificações excluídas", Snackbar.LENGTH_SHORT).show()
 
@@ -155,12 +156,25 @@ class NotificacaoFragment : Fragment() {
                 adapter.selecionadas.clear()
                 adapter.notifyDataSetChanged()
                 atualizarIconeLixeira()
-                dialog.dismiss()
+                dialogInterface.dismiss()
               }
-              .setNegativeButton("Cancelar") { dialog, _ ->
-                dialog.dismiss()
+              .setNegativeButton("Cancelar") { dialogInterface, _ ->
+                dialogInterface.dismiss()
               }
-              .show()
+              .create()
+
+            dialog.show()
+
+            dialog.window?.setBackgroundDrawableResource(R.drawable.dialog_background)
+
+            val width = (requireContext().resources.displayMetrics.widthPixels * 0.85).toInt()
+            dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+            dialog.findViewById<TextView>(android.R.id.message)?.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
+
           } else {
             modoSelecaoAtivo = false
             adapter.modoSelecao = false

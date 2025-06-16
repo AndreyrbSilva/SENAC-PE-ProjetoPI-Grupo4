@@ -6,6 +6,8 @@ import android.content.ContentValues
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.graphics.Color
+import android.widget.TextView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -477,14 +479,24 @@ class RelatorioFragment : Fragment() {
     }
 
     private fun mostrarDialogConfirmacaoLimpeza() {
-        AlertDialog.Builder(requireContext())
+        val dialog = AlertDialog.Builder(requireContext())
             .setTitle("Confirmar ação")
             .setMessage("Tem certeza que deseja limpar o histórico de relatórios?")
-            .setPositiveButton("Sim") { _, _ ->
-                limparHistorico()
-            }
+            .setPositiveButton("Sim") { _, _ -> limparHistorico() }
             .setNegativeButton("Cancelar", null)
-            .show()
+            .create()
+
+        dialog.show()
+
+        dialog.window?.setBackgroundDrawableResource(R.drawable.dialog_background)
+
+        val width = (resources.displayMetrics.widthPixels * 0.85).toInt()
+        dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+        (dialog.findViewById<TextView>(android.R.id.message))?.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
     }
 
     override fun onDestroyView() {

@@ -8,6 +8,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
 import android.widget.Toast
+import android.graphics.Color
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -201,13 +203,26 @@ class EditarSubpilarFragment : Fragment() {
   }
 
   private fun exibirDialogoConfirmacao() {
-    AlertDialog.Builder(requireContext())
+    val dialog = AlertDialog.Builder(requireContext())
       .setTitle("Confirmar exclusão")
       .setMessage("Deseja deletar este Subpilar?")
       .setPositiveButton("Deletar") { _, _ -> deletarSubpilar() }
       .setNegativeButton("Cancelar", null)
-      .show()
+      .create()
+
+    dialog.show()
+
+    dialog.window?.setBackgroundDrawableResource(R.drawable.dialog_background)
+
+    val width = (resources.displayMetrics.widthPixels * 0.85).toInt()
+    dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+    (dialog.findViewById<TextView>(android.R.id.message))?.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+
+    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
+    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
   }
+
 
   private fun exibirPopupMenu(anchor: View) {
     val popup = PopupMenu(requireContext(), anchor)

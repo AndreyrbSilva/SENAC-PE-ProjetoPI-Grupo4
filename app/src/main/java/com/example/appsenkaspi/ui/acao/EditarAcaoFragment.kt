@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.graphics.Color
+import android.widget.TextView
 import android.widget.ImageView
 import android.widget.PopupMenu
 import android.widget.Toast
@@ -305,12 +307,24 @@ class EditarAcaoFragment : Fragment() {
   }
 
   private fun exibirDialogoConfirmacao() {
-    AlertDialog.Builder(requireContext())
+    val dialog = AlertDialog.Builder(requireContext())
       .setTitle("Confirmar exclusão")
       .setMessage("Deseja deletar esta Ação?")
       .setPositiveButton("Deletar") { _, _ -> deletarAcao() }
       .setNegativeButton("Cancelar", null)
-      .show()
+      .create()
+
+    dialog.show()
+
+    dialog.window?.setBackgroundDrawableResource(R.drawable.dialog_background)
+
+    val width = (resources.displayMetrics.widthPixels * 0.85).toInt()
+    dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+    (dialog.findViewById<TextView>(android.R.id.message))?.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+
+    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
+    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
   }
 
   private fun deletarAcao() {

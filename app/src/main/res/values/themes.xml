@@ -9,7 +9,6 @@
         <item name="colorPrimaryContainer">@color/azulEscuro</item>
         <item name="colorSecondary">@color/azulClaro</item>
     </style>
-
   <style name="Theme.App" parent="Theme.MaterialComponents.DayNight.DarkActionBar" />
   <style name="Theme.AppSenkasPI" parent="Base.Theme.AppSenkasPI" />
 </resources>

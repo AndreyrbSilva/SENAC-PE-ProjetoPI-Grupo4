@@ -9,6 +9,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -196,33 +197,42 @@ class PerfilFragment : Fragment() {
   }
 
   private fun mostrarConfirmacaoLogout() {
-    AlertDialog.Builder(requireContext())
+    val dialog = AlertDialog.Builder(requireContext())
       .setTitle("Confirmação")
       .setMessage("Deseja realmente sair?")
-      .setPositiveButton("Sim") { dialog, _ ->
-        dialog.dismiss()
+      .setPositiveButton("Sim") { dialogInterface, _ ->
+        dialogInterface.dismiss()
         realizarLogout()
       }
-      .setNegativeButton("Não") { dialog, _ ->
-        dialog.dismiss()
+      .setNegativeButton("Não") { dialogInterface, _ ->
+        dialogInterface.dismiss()
       }
       .create()
-      .show()
+
+    dialog.show()
+
+    dialog.window?.setBackgroundDrawableResource(R.drawable.dialog_background)
+
+    val width = (requireContext().resources.displayMetrics.widthPixels * 0.85).toInt()
+    dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+    dialog.findViewById<TextView>(android.R.id.message)?.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+
+    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
+    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
   }
 
   private fun realizarLogout() {
-    // Limpar SharedPreferences do login
     val prefs = requireContext().getSharedPreferences("funcionario_prefs", Context.MODE_PRIVATE)
     prefs.edit().clear().apply()
 
-    // Abrir MainActivity com animação suave e limpar backstack
     val intent = Intent(requireContext(), MainActivity::class.java)
     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
 
     val options = ActivityOptionsCompat.makeCustomAnimation(
       requireContext(),
-      android.R.anim.fade_in,
-      android.R.anim.fade_out
+      R.anim.scale_fade_in,
+      R.anim.scale_fade_out
     )
 
     startActivity(intent, options.toBundle())

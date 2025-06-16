@@ -5,6 +5,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
+import android.widget.TextView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -268,7 +269,7 @@ class TelaAtividadeFragment : Fragment() {
   }
 
   private fun mostrarDialogoConfirmacao() {
-    AlertDialog.Builder(requireContext())
+    val dialog = AlertDialog.Builder(requireContext())
       .setTitle("Confirmação")
       .setMessage("Você tem certeza de que deseja deletar a atividade \"${binding.tituloAtividade.text}\"?")
       .setNegativeButton("Cancelar") { dialog, _ -> dialog.dismiss() }
@@ -282,11 +283,23 @@ class TelaAtividadeFragment : Fragment() {
         Toast.makeText(requireContext(), "Atividade deletada", Toast.LENGTH_SHORT).show()
         parentFragmentManager.popBackStack()
       }
-      .show()
-      .apply {
-        getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
-        getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
-      }
+      .create()
+
+    dialog.show()
+
+    // Aplica background customizado
+    dialog.window?.setBackgroundDrawableResource(R.drawable.dialog_background)
+
+    // Ajusta largura
+    val width = (resources.displayMetrics.widthPixels * 0.85).toInt()
+    dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+    // Alinha texto à esquerda
+    (dialog.findViewById<TextView>(android.R.id.message))?.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+
+    // Personaliza botões
+    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
+    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
   }
 
   override fun onDestroyView() {
