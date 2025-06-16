@@ -1,18 +1,18 @@
-## 📱 SENKAS - Projeto de Auditoria e Compliance Senac
+ ## 📱 SENKAS - Projeto de Auditoria e Compliance Senac
 
 Este é um aplicativo Android nativo desenvolvido no Android Studio, utilizando Kotlin e Room, voltado para o gerenciamento de pilares e atividades no contexto de auditoria e compliance do Senac.
 
 
 ---
 
-## 📝 Visão Geral
+ ## 📝 Visão Geral
 
 O sistema SENKAS foi criado para organizar e automatizar tarefas relacionadas à conformidade (compliance), permitindo que gestores e colaboradores acompanhem o progresso de ações e atividades associadas a diferentes pilares da instituição. Também inclui geração de relatórios, controle de produção e visualização analítica via dashboards.
 
 
 ---
 
-## ✅ Funcionalidades Principais
+✅ Funcionalidades Principais
 
 📌 Cadastro e gerenciamento de pilares, subpilares, ações e atividades
 
@@ -28,6 +28,7 @@ O sistema SENKAS foi criado para organizar e automatizar tarefas relacionadas à
 
 🖥️ Interface moderna, responsiva e com animações nativas
 
+![image](https://github.com/user-attachments/assets/e3f58084-a6b8-4894-b038-aa83195aad85)
 
 
 ---
@@ -203,6 +204,7 @@ Lucas – Telas e funcionalidades iniciais
 Vitor – Telas e funcionalidades iniciais
 
 Carlos – Documentação técnica
+
 ## Links
 [Notion](https://www.notion.so/Sistema-de-Ouvidoria-do-SENAC-1a6cf81c640d8080b6d3f4cd051740fa?pvs=4) - Documentação de Requisitos
 
