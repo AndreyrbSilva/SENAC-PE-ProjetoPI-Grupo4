@@ -1,141 +1,118 @@
-## 🏢 SENKAS - Projeto de Auditoria e Compliance Senac
-Este projeto é um sistema Android desenvolvido para o gerenciamento de pilares e atividades no contexto do Compliance do Senac. Ele facilita a criação, acompanhamento e automação de processos com funcionalidades como geração de relatórios, controle de progresso e perfis com permissões distintas.
+## 📱 SENKAS - Projeto de Auditoria e Compliance Senac
 
-## 📝 Visão Geral
-O sistema foi criado para organizar e automatizar tarefas relacionadas à conformidade (compliance), permitindo o gerenciamento de pilares, subpilares, ações e atividades por diferentes perfis de usuários. Também possibilita a análise de logs e geração de dashboards com base na produção de atividades realizadas.
+Este é um aplicativo Android nativo desenvolvido no Android Studio, utilizando Kotlin e Room, voltado para o gerenciamento de pilares e atividades no contexto de auditoria e compliance do Senac.
 
-## ✅ Funcionalidades Principais
-Cadastro e gerenciamento de pilares, subpilares, ações e atividades
-
-Atribuição de atividades a funcionários com progresso individual
-
-Processamento de porcentagem de execução por atividade realizada
-
-Geração de relatórios de produção e desempenho
-
-Perfis de acesso diferenciados com funcionalidades específicas
-
-Banco de dados inicial pré-carregado com usuários fictícios para testes
-
-Interface responsiva e moderna com animações
-
-## 🛠 Tecnologias Utilizadas
-Mobile: Kotlin
-
-Banco de Dados: SQLite (com Room – Android Jetpack)
-
-Persistência: Room + TypeConverters personalizados
-
-Concorrência: Kotlin Coroutines
-
-API: Python (Hospedada no Python Anywhere)
-
-## 🗃️ Banco de Dados
-O banco de dados local (appsenkaspi.db) é criado automaticamente ao iniciar o app, com dados pré-populados por meio de um RoomDatabase.Callback.
-
-Principais entidades:
-PilarEntity, SubpilarEntity, AcaoEntity, AtividadeEntity
-
-FuncionarioEntity (com perfis, login e permissões)
-
-Entidades relacionais: AcaoFuncionarioEntity, AtividadeFuncionarioEntity
-
-ChecklistItemEntity, RequisicaoEntity
-
-O acesso aos dados é realizado por meio de DAOs (Data Access Objects) para garantir separação de responsabilidades e acesso seguro às operações de CRUD.
-
-Claro! Abaixo está uma **documentação técnica** estruturada para você colar diretamente no seu `README.md`, descrevendo a API de geração de relatórios:
-
-
-# 📊 API de Geração de Relatórios
-
-Esta API fornece endpoints para gerar relatórios nos formatos **PDF**, **Word** e **Excel**, com base em dados de pilares, ações e atividades de um sistema de gestão. A API suporta relatórios gerais e por pilar.
-
-## 🚀 Endpoints
-
-### `GET /`
-
-Retorna uma mensagem de status indicando que a API está online.
-
-**Resposta:**
-
-```json
-{
-  "mensagem": "API SENKAS rodando com sucesso!"
-}
-```
-
-### `POST /relatorio/pdf`
-
-Gera e retorna um relatório em **PDF** com base nos dados enviados.
-
-**Corpo da requisição (JSON):**
-
-```json
-{
-  "tipoRelatorio": "geral" | "pilar",
-  "pilares": [...],
-  "pilarId": "123" // apenas se tipoRelatorio for "pilar"
-}
-```
-
-**Resposta:** Arquivo `.pdf` para download.
 
 ---
 
-### `POST /relatorio/word`
+## 📝 Visão Geral
 
-Gera e retorna um relatório em **Word (.docx)** com os mesmos dados da rota anterior.
-
-**Corpo da requisição (JSON):** igual ao endpoint `/relatorio/pdf`
-
-**Resposta:** Arquivo `.docx` para download.
+O sistema SENKAS foi criado para organizar e automatizar tarefas relacionadas à conformidade (compliance), permitindo que gestores e colaboradores acompanhem o progresso de ações e atividades associadas a diferentes pilares da instituição. Também inclui geração de relatórios, controle de produção e visualização analítica via dashboards.
 
 
-### `POST /relatorio/excel`
+---
 
-Gera e retorna um relatório em **Excel (.xlsx)**.
+## ✅ Funcionalidades Principais
 
-**Corpo da requisição (JSON):** igual ao endpoint `/relatorio/pdf`
+📌 Cadastro e gerenciamento de pilares, subpilares, ações e atividades
 
-**Resposta:** Arquivo `.xlsx` para download.
+👤 Atribuição de atividades a funcionários com controle de progresso
+
+📈 Cálculo automático da porcentagem de execução por atividade
+
+🧾 Geração de relatórios (PDF, Word e Excel) via API externa
+
+🔐 Perfis de acesso com permissões distintas
+
+📂 Banco de dados inicial com dados fictícios para testes
+
+🖥️ Interface moderna, responsiva e com animações nativas
 
 
-### `GET /relatorio/download/<nome_arquivo>`
 
-Permite o download de arquivos já gerados anteriormente, localizados na pasta `relatorios`.
+---
 
-**Parâmetros de URL:**
+## 🛠 Tecnologias Utilizadas
 
-* `nome_arquivo`: nome do arquivo a ser baixado.
+Mobile
 
-**Resposta:** Arquivo solicitado como download.
+Kotlin
 
-## 📁 Estrutura Esperada dos Dados
+Android Studio (versão mínima: 2022.1.1)
 
-Exemplo de entrada para `tipoRelatorio: "geral"`:
+Room (Jetpack)
 
-```json
+Coroutines
+
+
+Backend (Relatórios)
+
+Python (API hospedada no PythonAnywhere)
+
+Flask, FPDF, python-docx, pandas, openpyxl, matplotlib
+
+
+
+---
+
+## 🗃️ Banco de Dados
+
+Utilizamos SQLite com Room, criando a base local automaticamente ao iniciar o app. O banco já vem pré-populado para testes e conta com diversas entidades e relacionamentos:
+
+Entidades Principais
+
+PilarEntity, SubpilarEntity, AcaoEntity, AtividadeEntity
+
+FuncionarioEntity (login, perfil e permissões)
+
+AcaoFuncionarioEntity, AtividadeFuncionarioEntity
+
+ChecklistItemEntity, RequisicaoEntity
+
+
+
+---
+
+## 📊 API de Relatórios
+
+A API externa gera relatórios dinâmicos com base nos dados locais do app. É possível gerar arquivos nos formatos:
+
+PDF: com gráficos de status (pizza e barras)
+
+Word: estruturado em seções e tabelas
+
+Excel: com listas e detalhes de pilares, ações e atividades
+
+
+Principais Endpoints
+
+GET /
+POST /relatorio/pdf
+POST /relatorio/word
+POST /relatorio/excel
+GET /relatorio/download/<nome_arquivo>
+
+> A estrutura de envio inclui tipo do relatório, lista de pilares e, opcionalmente, o ID do pilar.
+
+
+
+
+---
+
+## 📂 Estrutura Esperada dos Dados
+
 {
   "tipoRelatorio": "geral",
   "pilares": [
     {
       "id": "1",
       "nome": "Governança",
-      "descricao": "Descrição do pilar",
-      "dataInicio": "2024-01-01",
-      "dataPrazo": "2024-12-31",
-      "status": "Em andamento",
-      "criadoPor": "Administrador",
       "acoes": [
         {
-          "nome": "Planejamento Estratégico",
-          "descricao": "Descrição da ação",
-          "status": "Ativa",
+          "nome": "Planejamento",
           "atividades": [
             {
               "nome": "Análise de Riscos",
-              "status": "Concluida",
               "responsavel": "João"
             }
           ]
@@ -144,77 +121,88 @@ Exemplo de entrada para `tipoRelatorio: "geral"`:
     }
   ]
 }
-```
 
-Para `tipoRelatorio: "pilar"`, envie apenas um pilar no array `pilares` e informe também `pilarId`.
 
-## 📄 Formatos de Relatório
+---
 
-* **PDF**: Contém informações dos pilares, ações e atividades, com gráficos de status (pizza e barras).
-* **Word**: Documento estruturado com tabelas, seções e gráficos embutidos.
-* **Excel**:
-  
-  * `geral`: lista os pilares com dados resumidos.
-  * `pilar`: lista as ações e atividades detalhadamente.
+## 🚀 Como Configurar o Ambiente de Desenvolvimento
 
-## 🛠️ Bibliotecas Utilizadas
+Pré-requisitos
 
-![image](https://github.com/user-attachments/assets/66e204b3-c490-4565-8ada-4bf28aeadb4c)
+Android Studio 2022.1.1 ou superior
 
-* **Flask**: Framework web.
-* **FPDF**: Geração de PDFs.
-* **python-docx**: Geração de documentos Word.
-* **pandas + openpyxl**: Manipulação de planilhas Excel.
-* **matplotlib**: Geração de gráficos.
+Kotlin SDK
 
-## 📂 Diretórios Importantes
+Gradle 7.4+
 
-* `relatorios/`: Arquivos de saída (.pdf, .docx, .xlsx)
-* `graficos/`: Imagens dos gráficos gerados (usadas nos relatórios)
+SDK Android API 30 ou superior
 
-## ✅ Validações e Regras
+Acesso à internet (para integração com a API externa)
 
-* `"tipoRelatorio"` deve ser `"geral"` ou `"pilar"`.
-* Se `"pilar"`, é obrigatório fornecer `pilarId` e um único item no array `pilares`.
-* Geração de gráficos ocorre apenas quando há dados válidos para isso.
 
-## 🚀 Como Executar o Projeto
-Clone o repositório:
+Passos para execução:
 
-bash
-Copiar
-Editar
+1. Clone o repositório:
+
+
+
 git clone https://github.com/seu-usuario/appsenkaspi.git
-cd appsenkaspi
-Abra o projeto no Android Studio.
+cd appsenkaspi/Mobile
 
-Sincronize o Gradle e construa o projeto.
+2. Abra o projeto no Android Studio
 
-Execute em um emulador Android ou dispositivo físico.
 
-## 📦 Requisitos do Sistema
+3. Aguarde o carregamento e sincronize o Gradle
 
-Dependência 1: API externa em Python
 
-Dependência 2: Banco de dados SQLite (Room)
+4. Conecte um dispositivo físico ou inicie um emulador
 
-Dependência 3: Android Studio + ambiente Kotlin configurado
 
-## 👥 Contribuições dos Membros do Grupo
-Saulo – Responsável pela implementação de funcionalidades e atualização do banco de dados.
+5. Rode o app pelo botão ▶️ “Run”
 
-Andrey – Responsável pelo design da interface, animações visuais e aprimoramento da experiência do usuário.
 
-Matheus – Responsável pela integração e implementações de API.
 
-João – Responsável pela gestão de erros e correção de bugs.
+> A base de dados será criada automaticamente com dados simulados.
 
-Lucas – Responsável pela criação das telas iniciais do escopo do projeto.
 
-Vitor – Responsável pela criação das telas iniciais do escopo do projeto.
 
-Carlos - Responsável por revisar e atualizar a documentação do projeto.
 
+---
+
+## 📦 Dependências Importantes
+
+// Room
+implementation "androidx.room:room-runtime:2.6.1"
+kapt "androidx.room:room-compiler:2.6.1"
+
+// Coroutines
+implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+
+// ViewModel & LiveData
+implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2"
+implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.6.2"
+
+// Networking (se houver)
+implementation "com.squareup.retrofit2:retrofit:2.9.0"
+
+
+---
+
+## 👥 Equipe e Responsabilidades
+
+Saulo – Banco de dados e funcionalidades
+
+Andrey – UI/UX e animações
+
+Matheus – Integrações com a API
+
+João – Tratamento de erros e debug
+
+Lucas – Telas e funcionalidades iniciais
+
+Vitor – Telas e funcionalidades iniciais
+
+Carlos – Documentação técnica
 ## Links
 [Notion](https://www.notion.so/Sistema-de-Ouvidoria-do-SENAC-1a6cf81c640d8080b6d3f4cd051740fa?pvs=4) - Documentação de Requisitos
 
