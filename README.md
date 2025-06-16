@@ -159,6 +159,8 @@ Para `tipoRelatorio: "pilar"`, envie apenas um pilar no array `pilares` e inform
 
 ## 🛠️ Bibliotecas Utilizadas
 
+![image](https://github.com/user-attachments/assets/66e204b3-c490-4565-8ada-4bf28aeadb4c)
+
 * **Flask**: Framework web.
 * **FPDF**: Geração de PDFs.
 * **python-docx**: Geração de documentos Word.
