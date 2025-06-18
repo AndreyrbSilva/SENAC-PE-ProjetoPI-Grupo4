@@ -30,6 +30,13 @@ import com.example.appsenkaspi.viewmodel.SubpilarViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+/**
+ * Fragmento responsável por exibir os detalhes de um Subpilar específico,
+ * incluindo suas ações vinculadas e o progresso total.
+ *
+ * Permite que o usuário visualize, edite ou adicione ações dependendo do seu cargo.
+ * Exibe também informações sobre o subpilar, como nome, descrição e prazo.
+ */
 class TelaSubpilarComAcoesFragment : Fragment() {
 
   private var _binding: FragmentTelaSubpilarBinding? = null
@@ -49,9 +56,9 @@ class TelaSubpilarComAcoesFragment : Fragment() {
   }
 
   override fun onCreateView(
-      inflater: LayoutInflater,
-      container: ViewGroup?,
-      savedInstanceState: Bundle?
+    inflater: LayoutInflater,
+    container: ViewGroup?,
+    savedInstanceState: Bundle?
   ): View {
     _binding = FragmentTelaSubpilarBinding.inflate(inflater, container, false)
     return binding.root
@@ -74,14 +81,15 @@ class TelaSubpilarComAcoesFragment : Fragment() {
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       funcionario?.let {
         configurarNotificacaoBadge(
-            rootView = view,
-            lifecycleOwner = viewLifecycleOwner,
-            fragmentManager = parentFragmentManager,
-            funcionarioId = it.id,
-            cargo = it.cargo,
-            viewModel = notificacaoViewModel
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = notificacaoViewModel
         )
 
+        // Controla os botões com base no cargo do usuário
         when (it.cargo) {
           Cargo.APOIO -> {
             binding.cardEditarSubpilar.visibility = View.GONE
@@ -91,11 +99,7 @@ class TelaSubpilarComAcoesFragment : Fragment() {
             binding.cardEditarSubpilar.visibility = View.VISIBLE
             binding.cardAdicionarAcoes.visibility = View.VISIBLE
           }
-          Cargo.GESTOR -> {
-            binding.cardEditarSubpilar.visibility = View.GONE
-            binding.cardAdicionarAcoes.visibility = View.GONE
-          }
-          else -> {
+          Cargo.GESTOR, null -> {
             binding.cardEditarSubpilar.visibility = View.GONE
             binding.cardAdicionarAcoes.visibility = View.GONE
           }
@@ -103,6 +107,7 @@ class TelaSubpilarComAcoesFragment : Fragment() {
       }
     }
 
+    // Observa dados do subpilar e atualiza UI
     subpilarViewModel.getSubpilarById(subpilarId).observe(viewLifecycleOwner) { subpilar ->
       if (subpilar != null) {
         preencherCamposComSubpilar(subpilar)
@@ -118,12 +123,14 @@ class TelaSubpilarComAcoesFragment : Fragment() {
     binding.iconeMenu.setOnClickListener { toggleSobre() }
   }
 
+  /** Configura o RecyclerView com layout vertical e adapter de ações. */
   private fun configurarRecycler() {
     binding.recyclerAcoes.layoutManager = LinearLayoutManager(requireContext())
     acaoAdapter = AcaoAdapter { acao -> abrirTelaAcao(acao) }
     binding.recyclerAcoes.adapter = acaoAdapter
   }
 
+  /** Observa lista de ações vinculadas ao subpilar e atualiza o estado da UI. */
   private fun observarAcoes() {
     val recycler = binding.recyclerAcoes
     val emptyView = binding.emptyStateView
@@ -140,6 +147,11 @@ class TelaSubpilarComAcoesFragment : Fragment() {
     }
   }
 
+  /**
+   * Preenche os campos da tela com os dados do subpilar.
+   *
+   * @param subpilar Objeto contendo os dados do subpilar atual.
+   */
   private fun preencherCamposComSubpilar(subpilar: SubpilarEntity) {
     binding.tituloSubpilar.text = "${subpilar.id}° Subpilar"
     binding.subtituloSubpilar.apply {
@@ -149,6 +161,7 @@ class TelaSubpilarComAcoesFragment : Fragment() {
 
     val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     binding.dataPrazoSubpilar.text = "Prazo: ${sdf.format(subpilar.dataPrazo)}"
+
     binding.textoSobre.text = if (subpilar.descricao.isNullOrBlank()) {
       "Nenhuma descrição adicionada."
     } else {
@@ -156,14 +169,13 @@ class TelaSubpilarComAcoesFragment : Fragment() {
     }
   }
 
+  /** Define o comportamento dos botões de editar subpilar e adicionar ação. */
   private fun configurarBotoes() {
     binding.cardEditarSubpilar.setOnClickListener {
       parentFragmentManager.beginTransaction()
         .setCustomAnimations(
-          R.anim.slide_fade_in_right,
-          R.anim.slide_fade_out_left,
-          R.anim.slide_fade_in_left,
-          R.anim.slide_fade_out_right
+          R.anim.slide_fade_in_right, R.anim.slide_fade_out_left,
+          R.anim.slide_fade_in_left, R.anim.slide_fade_out_right
         )
         .replace(R.id.main_container, EditarSubpilarFragment().apply {
           arguments = Bundle().apply { putInt("subpilarId", subpilarId) }
@@ -175,10 +187,8 @@ class TelaSubpilarComAcoesFragment : Fragment() {
     binding.cardAdicionarAcoes.setOnClickListener {
       parentFragmentManager.beginTransaction()
         .setCustomAnimations(
-          R.anim.slide_fade_in_right,
-          R.anim.slide_fade_out_left,
-          R.anim.slide_fade_in_left,
-          R.anim.slide_fade_out_right
+          R.anim.slide_fade_in_right, R.anim.slide_fade_out_left,
+          R.anim.slide_fade_in_left, R.anim.slide_fade_out_right
         )
         .replace(R.id.main_container, CriarAcaoFragment().apply {
           arguments = Bundle().apply { putInt("subpilarId", subpilarId) }
@@ -188,22 +198,28 @@ class TelaSubpilarComAcoesFragment : Fragment() {
     }
   }
 
+  /**
+   * Abre a tela de detalhes da ação selecionada.
+   *
+   * @param acao Ação a ser exibida.
+   */
   private fun abrirTelaAcao(acao: AcaoEntity) {
     val fragment = TelaAcaoFragment().apply {
       arguments = Bundle().apply { putInt("acaoId", acao.id!!) }
     }
     parentFragmentManager.beginTransaction()
       .setCustomAnimations(
-        R.anim.slide_fade_in_right,
-        R.anim.slide_fade_out_left,
-        R.anim.slide_fade_in_left,
-        R.anim.slide_fade_out_right
+        R.anim.slide_fade_in_right, R.anim.slide_fade_out_left,
+        R.anim.slide_fade_in_left, R.anim.slide_fade_out_right
       )
       .replace(R.id.main_container, fragment)
       .addToBackStack(null)
       .commit()
   }
 
+  /**
+   * Alterna visibilidade da seção "Sobre", com animações e ajuste de elevação.
+   */
   private fun toggleSobre() {
     val transition = AutoTransition().apply { duration = 300 }
     TransitionManager.beginDelayedTransition(binding.cabecalhoCard, transition)
@@ -218,6 +234,11 @@ class TelaSubpilarComAcoesFragment : Fragment() {
     }
   }
 
+  /**
+   * Anima a barra de progresso do subpilar com valor percentual suavizado.
+   *
+   * @param target Valor de progresso final (0–100).
+   */
   private fun animarProgresso(target: Int) {
     ObjectAnimator.ofInt(binding.progressoPilar, "progress", target).apply {
       duration = 500L
@@ -232,12 +253,15 @@ class TelaSubpilarComAcoesFragment : Fragment() {
   }
 
   companion object {
+    /**
+     * Cria uma nova instância do fragmento para o subpilar informado.
+     *
+     * @param subpilarId ID do subpilar a ser exibido.
+     */
     fun newInstance(subpilarId: Int): TelaSubpilarComAcoesFragment {
-      val fragment = TelaSubpilarComAcoesFragment()
-      fragment.arguments = Bundle().apply {
-        putInt("subpilarId", subpilarId)
+      return TelaSubpilarComAcoesFragment().apply {
+        arguments = Bundle().apply { putInt("subpilarId", subpilarId) }
       }
-      return fragment
     }
   }
 }

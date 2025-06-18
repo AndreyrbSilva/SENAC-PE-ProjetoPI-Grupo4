@@ -16,13 +16,24 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+
+/**
+ * Repositório responsável por gerenciar a lógica de negócio relacionada a atividades,
+ * incluindo notificações, atualizações de status, alterações de prazo e mudança de responsáveis.
+ *
+ * Integra DAOs para persistência local e utiliza notificações locais para alertar os usuários.
+ * Os métodos são utilizados em verificações programadas ou em resposta a eventos de edição/conclusão.
+ */
+
 class AtividadeRepository(
     private val context: Context,
     private val atividadeDao: AtividadeDao,
     private val atividadeFuncionarioDao: AtividadeFuncionarioDao,
     private val requisicaoDao: RequisicaoDao
 ) {
-
+  /**
+   * Remove as informações de hora de uma data para comparações baseadas apenas no dia.
+   */
   private fun truncarData(data: Date): Date {
     return Calendar.getInstance().apply {
       time = data
@@ -35,12 +46,17 @@ class AtividadeRepository(
 
 
 
-
+  /**
+   * Formata uma data para o padrão brasileiro "dd/MM/yyyy".
+   */
   fun formatarData(data: Date): String {
     val sdf = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
     return sdf.format(data)
   }
-
+  /**
+   * Verifica atividades com prazos se aproximando e envia notificações e requisições
+   * para responsáveis caso a atividade esteja a 30, 15, 7 dias ou entre 6 e 1 dia do vencimento.
+   */
   suspend fun verificarNotificacoesDePrazo() {
     val hoje = truncarData(Date())
     val atividades = atividadeDao.getTodasAtividadesComDataPrazo()
@@ -90,7 +106,9 @@ class AtividadeRepository(
       }
     }
   }
-
+  /**
+   * Marca como vencidas atividades com data de prazo anterior a hoje e gera notificações.
+   */
   suspend fun verificarAtividadesVencidas() {
     val hoje = truncarData(Date())
     val atividades = atividadeDao.getTodasAtividadesComDataPrazo()
@@ -128,7 +146,9 @@ class AtividadeRepository(
       }
     }
   }
-
+  /**
+   * Atualiza o status da atividade para concluída e notifica os responsáveis.
+   */
   suspend fun tratarConclusaoAtividade(atividade: AtividadeEntity) {
     val id = atividade.id ?: return
     atividadeDao.update(atividade)
@@ -157,6 +177,9 @@ class AtividadeRepository(
       )
     }
   }
+  /**
+   * Trata mudanças no prazo da atividade, atualizando status e notificando responsáveis.
+   */
 
   suspend fun tratarAlteracaoPrazo(atividadeNova: AtividadeEntity, atividadeAntiga: AtividadeEntity) {
     val id = atividadeNova.id ?: return
@@ -261,7 +284,9 @@ class AtividadeRepository(
     }
   }
 
-
+  /**
+   * Notifica responsáveis adicionados ou removidos da atividade.
+   */
   suspend fun notificarMudancaResponsaveis(
       atividade: AtividadeEntity,
       adicionados: List<FuncionarioEntity>,
@@ -328,6 +353,10 @@ class AtividadeRepository(
       }
     }
   }
+  /**
+   * Verifica se notificações de vencimento foram criadas para atividades já marcadas como vencidas.
+   * Caso não existam, gera requisições e notifica os responsáveis.
+   */
   suspend fun verificarNotificacoesDeAtividadesVencidasJaMarcadas() {
     val atividades = atividadeDao.getAtividadesPorStatus(StatusAtividade.VENCIDA)
 

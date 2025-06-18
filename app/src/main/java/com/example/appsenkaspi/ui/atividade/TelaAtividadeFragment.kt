@@ -40,15 +40,24 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Fragmento responsável por exibir os detalhes de uma atividade específica.
+ *
+ * Exibe informações da atividade como título, descrição, prioridade, datas, responsáveis
+ * e opções de interação como editar, deletar, confirmar conclusão ou solicitar aprovação.
+ * O comportamento da tela varia de acordo com o cargo do funcionário logado (Apoio ou Coordenador).
+ */
 class TelaAtividadeFragment : Fragment() {
 
   private var _binding: FragmentTelaAtividadeBinding? = null
   private val binding get() = _binding!!
+
   private val atividadeViewModel: AtividadeViewModel by activityViewModels()
   private val checklistViewModel: ChecklistViewModel by activityViewModels()
   private val acaoViewModel: AcaoViewModel by activityViewModels()
   private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
   private val requisicaoViewModel: NotificacaoViewModel by activityViewModels()
+
   private var atividadeId: Int = -1
 
   override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -61,19 +70,21 @@ class TelaAtividadeFragment : Fragment() {
     super.onViewCreated(view, savedInstanceState)
     configurarBotaoVoltar(view)
 
+    // Observa o funcionário logado para configurar notificações e botões da interface
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       funcionario?.let {
-          configurarNotificacaoBadge(
-              rootView = view,
-              lifecycleOwner = viewLifecycleOwner,
-              fragmentManager = parentFragmentManager,
-              funcionarioId = it.id,
-              cargo = it.cargo,
-              viewModel = requisicaoViewModel
-          )
+        configurarNotificacaoBadge(
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = requisicaoViewModel
+        )
       }
     }
 
+    // Altera os botões visíveis de acordo com o cargo do usuário (Apoio ou Coordenador)
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       when (funcionario?.cargo) {
         Cargo.APOIO -> {
@@ -97,12 +108,14 @@ class TelaAtividadeFragment : Fragment() {
       }
     }
 
+    // Verifica se o ID da atividade é válido
     if (atividadeId == -1) {
       Toast.makeText(requireContext(), "Erro: atividade inválida.", Toast.LENGTH_SHORT).show()
       parentFragmentManager.popBackStack()
       return
     }
 
+    // Carrega dados da atividade e atualiza a UI
     atividadeViewModel.getAtividadeComFuncionariosById(atividadeId).observe(viewLifecycleOwner) { atividadeComFuncionarios ->
       if (atividadeComFuncionarios != null) {
         preencherCampos(atividadeComFuncionarios)
@@ -115,6 +128,7 @@ class TelaAtividadeFragment : Fragment() {
       }
     }
 
+    // Ação: editar atividade
     binding.btnEditar.setOnClickListener {
       val args = Bundle().apply { putInt("atividadeId", atividadeId) }
       parentFragmentManager.beginTransaction()
@@ -129,10 +143,12 @@ class TelaAtividadeFragment : Fragment() {
         .commit()
     }
 
+    // Ação: deletar atividade
     binding.btnDeletar.setOnClickListener {
       mostrarDialogoConfirmacao()
     }
 
+    // Ação: concluir atividade diretamente (visível para Coordenador)
     binding.cardConfirmarAtividade.setOnClickListener {
       atividadeViewModel.getAtividadeById(atividadeId).observe(viewLifecycleOwner) { atividade ->
         if (atividade != null) {
@@ -147,7 +163,6 @@ class TelaAtividadeFragment : Fragment() {
           }
 
           val atividadeAtualizada = atividade.copy(status = StatusAtividade.CONCLUIDA)
-          Log.d("ATIVIDADE_OBSERVADA", "Status da atividade: ${atividade.status}")
 
           atividadeViewModel.concluirAtividade(atividadeAtualizada)
           acaoViewModel.atualizarStatusAcaoAutomaticamente(atividade.acaoId)
@@ -158,6 +173,7 @@ class TelaAtividadeFragment : Fragment() {
       }
     }
 
+    // Ação: Apoio pede confirmação de conclusão ao Coordenador
     binding.cardPedirConfirmacao.setOnClickListener {
       atividadeViewModel.getAtividadeComFuncionariosById(atividadeId).observe(viewLifecycleOwner) { atividade ->
 
@@ -190,10 +206,11 @@ class TelaAtividadeFragment : Fragment() {
 
         val funcionario = funcionarioViewModel.funcionarioLogado.value ?: return@observe
 
+        // Cria e envia requisição de conclusão da atividade para o Coordenador
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-          val acao = AppDatabase.Companion.getDatabase(requireContext()).acaoDao().getAcaoPorIdDireto(atividade.atividade.acaoId)
+          val acao = AppDatabase.getDatabase(requireContext()).acaoDao().getAcaoPorIdDireto(atividade.atividade.acaoId)
           val nomePilar = acao?.pilarId?.let {
-            AppDatabase.Companion.getDatabase(requireContext()).pilarDao().getNomePilarPorId(it)
+            AppDatabase.getDatabase(requireContext()).pilarDao().getNomePilarPorId(it)
           } ?: "Pilar não identificado"
 
           val atividadeJson = AtividadeJson(
@@ -214,11 +231,11 @@ class TelaAtividadeFragment : Fragment() {
           val json = Gson().toJson(atividadeJson)
 
           val requisicao = RequisicaoEntity(
-              tipo = TipoRequisicao.COMPLETAR_ATIVIDADE,
-              atividadeJson = json,
-              status = StatusRequisicao.PENDENTE,
-              solicitanteId = funcionario.id,
-              dataSolicitacao = Date()
+            tipo = TipoRequisicao.COMPLETAR_ATIVIDADE,
+            atividadeJson = json,
+            status = StatusRequisicao.PENDENTE,
+            solicitanteId = funcionario.id,
+            dataSolicitacao = Date()
           )
 
           requisicaoViewModel.inserirRequisicao(requisicao)
@@ -232,6 +249,11 @@ class TelaAtividadeFragment : Fragment() {
     }
   }
 
+  /**
+   * Preenche os campos da interface com os dados da atividade.
+   *
+   * Inclui título, descrição, prioridade com cores, datas formatadas e fotos dos responsáveis.
+   */
   private fun preencherCampos(atividade: AtividadeComFuncionarios) {
     binding.tituloAtividade.text = atividade.atividade.nome
     binding.descricaoAtividade.text = atividade.atividade.descricao
@@ -255,6 +277,7 @@ class TelaAtividadeFragment : Fragment() {
     binding.textDataInicio.text = "Data de início da atividade ${sdf.format(atividade.atividade.dataInicio)}"
     binding.textDataPrazo.text = "Essa atividade deve ser finalizada até ${sdf.format(atividade.atividade.dataPrazo)}"
 
+    // Fotos dos responsáveis
     binding.containerResponsaveis.removeAllViews()
     val dimensao = resources.getDimensionPixelSize(R.dimen.tamanho_foto_responsavel)
     atividade.funcionarios.forEach { funcionario ->
@@ -268,6 +291,11 @@ class TelaAtividadeFragment : Fragment() {
     }
   }
 
+  /**
+   * Exibe um diálogo de confirmação antes de deletar a atividade.
+   *
+   * A exclusão é permanente e atualiza o status da ação associada.
+   */
   private fun mostrarDialogoConfirmacao() {
     val dialog = AlertDialog.Builder(requireContext())
       .setTitle("Confirmação")

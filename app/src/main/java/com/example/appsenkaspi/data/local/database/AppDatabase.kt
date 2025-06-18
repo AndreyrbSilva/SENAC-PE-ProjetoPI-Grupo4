@@ -30,126 +30,146 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+/**
+ * Classe abstrata que define a base de dados principal da aplicação usando Room.
+ * Contém a configuração de entidades, conversores de tipo e DAOs.
+ *
+ * - Inclui entidades como Pilar, Subpilar, Ação, Atividade, Funcionário, Requisição, entre outras.
+ * - Utiliza um singleton para garantir instância única da base de dados.
+ * - Insere funcionários iniciais no banco de dados ao ser criado.
+ */
 @Database(
-    entities = [
-        PilarEntity::class,
-        SubpilarEntity::class,
-        AcaoEntity::class,
-        AtividadeEntity::class,
-        FuncionarioEntity::class,
-        ChecklistItemEntity::class,
-        AcaoFuncionarioEntity::class,
-        AtividadeFuncionarioEntity::class,
-        RequisicaoEntity::class,
-
-    ],
-    version = 3, // ou 3 se já atualizou
-    exportSchema = false
+  entities = [
+    PilarEntity::class,
+    SubpilarEntity::class,
+    AcaoEntity::class,
+    AtividadeEntity::class,
+    FuncionarioEntity::class,
+    ChecklistItemEntity::class,
+    AcaoFuncionarioEntity::class,
+    AtividadeFuncionarioEntity::class,
+    RequisicaoEntity::class
+  ],
+  version = 3,
+  exportSchema = false
 )
 @TypeConverters(Converters::class)
-
 abstract class AppDatabase : RoomDatabase() {
 
-    abstract fun pilarDao(): PilarDao
-    abstract fun subpilarDao(): SubpilarDao
-    abstract fun acaoDao(): AcaoDao
-    abstract fun atividadeDao(): AtividadeDao
-    abstract fun funcionarioDao(): FuncionarioDao
-    abstract fun checklistDao(): ChecklistDao
-    abstract fun requisicaoDao(): RequisicaoDao
+  /** DAO para acessar dados dos pilares. */
+  abstract fun pilarDao(): PilarDao
 
+  /** DAO para acessar dados dos subpilares. */
+  abstract fun subpilarDao(): SubpilarDao
 
+  /** DAO para acessar dados das ações. */
+  abstract fun acaoDao(): AcaoDao
 
-    abstract fun acaoFuncionarioDao(): AcaoFuncionarioDao    // 🔵 Adicionado
-    abstract fun atividadeFuncionarioDao(): AtividadeFuncionarioDao  // 🔵 Adicionado
+  /** DAO para acessar dados das atividades. */
+  abstract fun atividadeDao(): AtividadeDao
 
-    companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
+  /** DAO para acessar dados dos funcionários. */
+  abstract fun funcionarioDao(): FuncionarioDao
 
-        fun getDatabase(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "appsenkaspi.db"
+  /** DAO para acessar os itens de checklist das atividades. */
+  abstract fun checklistDao(): ChecklistDao
+
+  /** DAO para acessar e manipular as requisições do sistema. */
+  abstract fun requisicaoDao(): RequisicaoDao
+
+  /** DAO para a relação N:N entre Ação e Funcionário. */
+  abstract fun acaoFuncionarioDao(): AcaoFuncionarioDao
+
+  /** DAO para a relação N:N entre Atividade e Funcionário. */
+  abstract fun atividadeFuncionarioDao(): AtividadeFuncionarioDao
+
+  companion object {
+    @Volatile
+    private var INSTANCE: AppDatabase? = null
+
+    /**
+     * Retorna a instância única do banco de dados.
+     * Caso ainda não exista, cria e inicializa com dados de funcionários.
+     */
+    fun getDatabase(context: Context): AppDatabase {
+      return INSTANCE ?: synchronized(this) {
+        val instance = Room.databaseBuilder(
+          context.applicationContext,
+          AppDatabase::class.java,
+          "appsenkaspi.db"
+        )
+          .addCallback(object : Callback() {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+              super.onCreate(db)
+              // Popula a tabela de funcionários com registros iniciais
+              CoroutineScope(Dispatchers.IO).launch {
+                val dao = getDatabase(context).funcionarioDao()
+                dao.inserirTodos(
+                  listOf(
+                    FuncionarioEntity(
+                      nomeCompleto = "Ana Beatriz Souza",
+                      email = "ana.souza@example.com",
+                      cargo = Cargo.COORDENADOR,
+                      fotoPerfil = "https://i.pravatar.cc/150?img=1",
+                      nomeUsuario = "ana.souza",
+                      senha = "senha123",
+                      idAcesso = 1,
+                      numeroTel = "(84)91191-9291",
+                      fotoBanner = ""
+                    ),
+                    FuncionarioEntity(
+                      nomeCompleto = "Usuario Teste",
+                      email = "usuario.teste@example.com",
+                      cargo = Cargo.COORDENADOR,
+                      fotoPerfil = "https://i.pravatar.cc/150?img=1",
+                      nomeUsuario = "teste",
+                      senha = "senha123",
+                      idAcesso = 5,
+                      numeroTel = "(84)91191-9291",
+                      fotoBanner = ""
+                    ),
+                    FuncionarioEntity(
+                      nomeCompleto = "Fernanda Oliveira",
+                      email = "fernanda.oliveira@example.com",
+                      cargo = Cargo.APOIO,
+                      fotoPerfil = "https://i.pravatar.cc/150?img=3",
+                      nomeUsuario = "fernanda.oliveira",
+                      senha = "senha123",
+                      idAcesso = 3,
+                      numeroTel = "(84)91191-9291",
+                      fotoBanner = ""
+                    ),
+                    FuncionarioEntity(
+                      nomeCompleto = "Carlos Eduardo Silva",
+                      email = "carlos.silva@example.com",
+                      cargo = Cargo.GESTOR,
+                      fotoPerfil = "https://i.pravatar.cc/150?img=2",
+                      nomeUsuario = "carlos.silva",
+                      senha = "senha123",
+                      idAcesso = 2,
+                      numeroTel = "(84)91191-9291",
+                      fotoBanner = ""
+                    ),
+                    FuncionarioEntity(
+                      nomeCompleto = "Eu mesmo",
+                      email = "eumesmo.oliveira@example.com",
+                      cargo = Cargo.APOIO,
+                      fotoPerfil = "https://i.pravatar.cc/150?img=3",
+                      nomeUsuario = "fernanda.oliveira",
+                      senha = "senha123",
+                      idAcesso = 4,
+                      numeroTel = "(84)91191-9291",
+                      fotoBanner = ""
+                    )
+                  )
                 )
-                    .addCallback(object : Callback() {
-                        override fun onCreate(db: SupportSQLiteDatabase) {
-                            super.onCreate(db)
-                            // Executado apenas na criação do banco
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val dao = getDatabase(context).funcionarioDao()
-                                dao.inserirTodos(listOf(
-                                    FuncionarioEntity(
-                                        nomeCompleto = "Ana Beatriz Souza",
-                                        email = "ana.souza@example.com",
-                                        cargo = Cargo.COORDENADOR,
-                                        fotoPerfil = "https://i.pravatar.cc/150?img=1",
-                                        nomeUsuario = "ana.souza",
-                                        senha = "senha123",
-                                        idAcesso = 1,
-                                        numeroTel = "(84)91191-9291",
-                                        fotoBanner = ""
-
-                                    ),
-                                    FuncionarioEntity(
-                                        nomeCompleto = "Usuario Teste",
-                                        email = "usuario.teste@example.com",
-                                        cargo = Cargo.COORDENADOR,
-                                        fotoPerfil = "https://i.pravatar.cc/150?img=1",
-                                        nomeUsuario = "teste",
-                                        senha = "senha123",
-                                        idAcesso = 5,
-                                        numeroTel = "(84)91191-9291",
-                                        fotoBanner = ""
-
-                                    ),
-                                    FuncionarioEntity(
-                                        nomeCompleto = "Fernanda Oliveira",
-                                        email = "fernanda.oliveira@example.com",
-                                        cargo = Cargo.APOIO,
-                                        fotoPerfil = "https://i.pravatar.cc/150?img=3",
-                                        nomeUsuario = "fernanda.oliveira",
-                                        senha = "senha123",
-                                        idAcesso = 3,
-                                        numeroTel = "(84)91191-9291",
-                                        fotoBanner = ""
-                                    ),
-                                    FuncionarioEntity(
-                                        nomeCompleto = "Carlos Eduardo Silva",
-                                        email = "carlos.silva@example.com",
-                                        cargo = Cargo.GESTOR,
-                                        fotoPerfil = "https://i.pravatar.cc/150?img=2",
-                                        nomeUsuario = "carlos.silva",
-                                        senha = "senha123",
-                                        idAcesso = 2,
-                                        numeroTel = "(84)91191-9291",
-                                        fotoBanner = ""
-                                    ),
-                                    FuncionarioEntity(
-                                        nomeCompleto = "Eu mesmo",
-                                        email = "eumesmo.oliveira@example.com",
-                                        cargo = Cargo.APOIO,
-                                        fotoPerfil = "https://i.pravatar.cc/150?img=3",
-                                        nomeUsuario = "fernanda.oliveira",
-                                        senha = "senha123",
-                                        idAcesso = 4,
-                                        numeroTel = "(84)91191-9291",
-                                        fotoBanner = ""
-                                    ),
-                                    // adicione quantos quiser…
-                                )
-                                    // outros funcionários...
-                                )
-                            }
-                        }
-                    })
-                    .build()
-                INSTANCE = instance
-                instance
+              }
             }
-        }
+          })
+          .build()
+        INSTANCE = instance
+        instance
+      }
     }
-
+  }
 }

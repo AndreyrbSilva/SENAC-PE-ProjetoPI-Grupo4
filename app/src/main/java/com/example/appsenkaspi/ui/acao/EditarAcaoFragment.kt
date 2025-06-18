@@ -40,6 +40,13 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Fragmento responsável pela edição de uma Ação existente.
+ *
+ * Esta classe permite que usuários com diferentes cargos (Coordenador, Apoio) editem ações,
+ * verifiquem prazos, atribuam responsáveis e solicitem confirmação de alterações.
+ * Coordenadores podem editar diretamente, enquanto usuários de apoio enviam requisições.
+ */
 class EditarAcaoFragment : Fragment() {
 
   private var _binding: FragmentEditarAcaoBinding? = null
@@ -60,31 +67,37 @@ class EditarAcaoFragment : Fragment() {
   private val funcionariosSelecionados = mutableListOf<FuncionarioEntity>()
   private lateinit var adapterSelecionados: FuncionarioSelecionadoAdapter
 
+  /**
+   * Infla a visualização do layout do fragmento.
+   */
   override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
     _binding = FragmentEditarAcaoBinding.inflate(inflater, container, false)
     return binding.root
   }
 
+  /**
+   * Inicializa os componentes da interface e define o comportamento dos botões conforme o cargo do usuário.
+   */
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)
     configurarBotaoVoltar(view)
 
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       funcionario?.let {
-          configurarNotificacaoBadge(
-              rootView = view,
-              lifecycleOwner = viewLifecycleOwner,
-              fragmentManager = parentFragmentManager,
-              funcionarioId = it.id,
-              cargo = it.cargo,
-              viewModel = notificacaoViewModel
-          )
+        configurarNotificacaoBadge(
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = notificacaoViewModel
+        )
       }
     }
 
     adapterSelecionados = FuncionarioSelecionadoAdapter(funcionariosSelecionados)
     binding.recyclerViewFuncionariosSelecionados.layoutManager =
-        LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+      LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
     binding.recyclerViewFuncionariosSelecionados.adapter = adapterSelecionados
 
     binding.buttonPickDateEdicao.setOnClickListener { abrirDatePicker() }
@@ -142,6 +155,9 @@ class EditarAcaoFragment : Fragment() {
     }
   }
 
+  /**
+   * Envia uma requisição de edição da ação para aprovação por um Coordenador.
+   */
   private fun enviarRequisicaoEdicao() {
     val nome = binding.inputNomeEdicao.text.toString().trim()
     val descricao = binding.inputDescricaoEdicao.text.toString().trim()
@@ -154,11 +170,11 @@ class EditarAcaoFragment : Fragment() {
 
     lifecycleScope.launch(Dispatchers.IO) {
       if (!validarPrazoEdicao()) return@launch
-      val acao = AppDatabase.Companion.getDatabase(requireContext()).acaoDao().getAcaoPorIdDireto(acaoId) ?: return@launch
+      val acao = AppDatabase.getDatabase(requireContext()).acaoDao().getAcaoPorIdDireto(acaoId) ?: return@launch
 
       val nomeAlvo = when {
-        acao.subpilarId != null -> AppDatabase.Companion.getDatabase(requireContext()).subpilarDao().buscarNomeSubpilarPorId(acao.subpilarId!!)
-        acao.pilarId != null -> AppDatabase.Companion.getDatabase(requireContext()).pilarDao().getNomePilarPorId(acao.pilarId!!)
+        acao.subpilarId != null -> AppDatabase.getDatabase(requireContext()).subpilarDao().buscarNomeSubpilarPorId(acao.subpilarId!!)
+        acao.pilarId != null -> AppDatabase.getDatabase(requireContext()).pilarDao().getNomePilarPorId(acao.pilarId!!)
         else -> "Destino não identificado"
       }
 
@@ -178,26 +194,29 @@ class EditarAcaoFragment : Fragment() {
       )
 
       val requisicao = RequisicaoEntity(
-          tipo = TipoRequisicao.EDITAR_ACAO,
-          acaoJson = Gson().toJson(acaoJson),
-          status = StatusRequisicao.PENDENTE,
-          solicitanteId = funcionarioLogado.id,
-          dataSolicitacao = Date()
+        tipo = TipoRequisicao.EDITAR_ACAO,
+        acaoJson = Gson().toJson(acaoJson),
+        status = StatusRequisicao.PENDENTE,
+        solicitanteId = funcionarioLogado.id,
+        dataSolicitacao = Date()
       )
 
-      AppDatabase.Companion.getDatabase(requireContext()).requisicaoDao().inserir(requisicao)
+      AppDatabase.getDatabase(requireContext()).requisicaoDao().inserir(requisicao)
 
-        withContext(Dispatchers.Main) {
-            Toast.makeText(
-                requireContext(),
-                "Requisição enviada para aprovação!",
-                Toast.LENGTH_SHORT
-            ).show()
-            parentFragmentManager.popBackStack()
-        }
+      withContext(Dispatchers.Main) {
+        Toast.makeText(
+          requireContext(),
+          "Requisição enviada para aprovação!",
+          Toast.LENGTH_SHORT
+        ).show()
+        parentFragmentManager.popBackStack()
+      }
     }
   }
 
+  /**
+   * Aplica alterações diretamente no banco de dados local se o usuário for Coordenador.
+   */
   private fun confirmarEdicaoAcao() {
     val nome = binding.inputNomeEdicao.text.toString().trim()
     val descricao = binding.inputDescricaoEdicao.text.toString().trim()
@@ -235,6 +254,9 @@ class EditarAcaoFragment : Fragment() {
     }
   }
 
+  /**
+   * Verifica se o novo prazo definido ultrapassa o prazo máximo permitido da estrutura pai.
+   */
   private suspend fun validarPrazoEdicao(): Boolean {
     if (dataPrazoSelecionada == null) {
       binding.buttonPickDateEdicao.error = "Selecione uma data de prazo"
@@ -262,6 +284,9 @@ class EditarAcaoFragment : Fragment() {
     return true
   }
 
+  /**
+   * Remove componentes de tempo de uma data, preservando apenas o dia.
+   */
   private fun truncarData(data: Date): Date {
     return Calendar.getInstance().apply {
       time = data
@@ -272,25 +297,34 @@ class EditarAcaoFragment : Fragment() {
     }.time
   }
 
+  /**
+   * Exibe um seletor de data para alteração do prazo da ação.
+   */
   private fun abrirDatePicker() {
     DatePickerDialog(
-        requireContext(),
-        { _, ano, mes, dia ->
-            calendario.set(ano, mes, dia)
-            dataPrazoSelecionada = calendario.time
-            val fmt = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-            binding.buttonPickDateEdicao.text = fmt.format(dataPrazoSelecionada!!)
-        },
-        calendario.get(Calendar.YEAR),
-        calendario.get(Calendar.MONTH),
-        calendario.get(Calendar.DAY_OF_MONTH)
+      requireContext(),
+      { _, ano, mes, dia ->
+        calendario.set(ano, mes, dia)
+        dataPrazoSelecionada = calendario.time
+        val fmt = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        binding.buttonPickDateEdicao.text = fmt.format(dataPrazoSelecionada!!)
+      },
+      calendario.get(Calendar.YEAR),
+      calendario.get(Calendar.MONTH),
+      calendario.get(Calendar.DAY_OF_MONTH)
     ).show()
   }
 
+  /**
+   * Abre o diálogo de seleção de responsáveis.
+   */
   private fun abrirDialogSelecionarFuncionarios() {
     SelecionarResponsavelDialogFragment().show(childFragmentManager, "SelecionarFuncionariosDialog")
   }
 
+  /**
+   * Exibe menu de opções com ações como exclusão da Ação.
+   */
   private fun exibirPopupMenu(anchor: View) {
     val popup = PopupMenu(requireContext(), anchor)
     popup.menuInflater.inflate(R.menu.menu_pilar, popup.menu)
@@ -306,6 +340,9 @@ class EditarAcaoFragment : Fragment() {
     popup.show()
   }
 
+  /**
+   * Exibe diálogo de confirmação antes de excluir a Ação.
+   */
   private fun exibirDialogoConfirmacao() {
     val dialog = AlertDialog.Builder(requireContext())
       .setTitle("Confirmar exclusão")
@@ -327,9 +364,12 @@ class EditarAcaoFragment : Fragment() {
     dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
   }
 
+  /**
+   * Exclui permanentemente a ação do banco de dados.
+   */
   private fun deletarAcao() {
     lifecycleScope.launch {
-      val dao = AppDatabase.Companion.getDatabase(requireContext()).acaoDao()
+      val dao = AppDatabase.getDatabase(requireContext()).acaoDao()
       val acao = dao.buscarAcaoPorId(acaoId)
       if (acao != null) {
         dao.deletarAcao(acao)
@@ -341,6 +381,9 @@ class EditarAcaoFragment : Fragment() {
     }
   }
 
+  /**
+   * Libera a memória do binding ao destruir a view.
+   */
   override fun onDestroyView() {
     super.onDestroyView()
     _binding = null

@@ -15,8 +15,31 @@ import com.example.appsenkaspi.data.local.entity.RequisicaoEntity
 import com.example.appsenkaspi.data.local.enums.StatusRequisicao
 import com.example.appsenkaspi.data.local.enums.TipoRequisicao
 
-data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+/**
+ * Representa uma tupla de quatro elementos. Útil para carregar múltiplos dados relacionados
+ * a uma notificação em um único objeto (como título, ícone, cor e mensagem).
+ */
+data class Quadruple<A, B, C, D>(
+  val first: A,
+  val second: B,
+  val third: C,
+  val fourth: D
+)
 
+/**
+ * Adapter responsável por exibir a lista de notificações e requisições de atividades/ações.
+ *
+ * Suporta dois modos distintos:
+ * - Modo Coordenador: exibe ícones de aprovação pendente.
+ * - Modo Apoio: exibe o status da resposta do coordenador.
+ *
+ * Também oferece suporte a modo de seleção múltipla com checkboxes para ações em lote.
+ *
+ * @property funcionarioIdLogado ID do funcionário logado, usado para filtrar notificações automáticas.
+ * @property modoCoordenador Indica se o usuário visualizando é coordenador (com poderes de decisão).
+ * @property onSelecaoMudou Callback invocado sempre que a seleção de itens muda.
+ * @property onItemClick Callback chamado ao clicar em um item fora do modo de seleção.
+ */
 class RequisicaoAdapter(
   private val funcionarioIdLogado: Int,
   var modoCoordenador: Boolean,
@@ -24,9 +47,15 @@ class RequisicaoAdapter(
   var onItemClick: (RequisicaoEntity) -> Unit = {}
 ) : ListAdapter<RequisicaoEntity, RequisicaoAdapter.ViewHolder>(DIFF_CALLBACK) {
 
+  /** Indica se o adapter está no modo de seleção múltipla. */
   var modoSelecao = false
+
+  /** Conjunto de requisições atualmente selecionadas. */
   val selecionadas = mutableSetOf<RequisicaoEntity>()
 
+  /**
+   * ViewHolder que representa a visualização de uma notificação individual.
+   */
   inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     val iconStatus: ImageView = itemView.findViewById(R.id.iconStatus)
     val textoTitulo: TextView = itemView.findViewById(R.id.textoTitulo)
@@ -42,6 +71,8 @@ class RequisicaoAdapter(
 
   override fun onBindViewHolder(holder: ViewHolder, position: Int) {
     val requisicao = getItem(position)
+
+    // Verifica se a notificação é automática (ex: prazos, alterações)
     val isNotificacaoAutomatica = requisicao.tipo in listOf(
       TipoRequisicao.ATIVIDADE_PARA_VENCER,
       TipoRequisicao.ATIVIDADE_VENCIDA,
@@ -51,6 +82,7 @@ class RequisicaoAdapter(
       TipoRequisicao.RESPONSAVEL_REMOVIDO
     )
 
+    // Reset da view antes da vinculação (evita efeitos colaterais de reuso)
     holder.itemView.clearAnimation()
     holder.itemView.alpha = 1f
     holder.itemView.visibility = View.VISIBLE
@@ -60,6 +92,7 @@ class RequisicaoAdapter(
     holder.checkBox.isChecked = false
 
     if (isNotificacaoAutomatica) {
+      // Oculta notificações automáticas destinadas a outros funcionários
       if (requisicao.solicitanteId != funcionarioIdLogado) {
         holder.itemView.visibility = View.GONE
         holder.itemView.layoutParams = RecyclerView.LayoutParams(0, 0)
@@ -67,6 +100,7 @@ class RequisicaoAdapter(
       }
 
       if (requisicao.resolvida) {
+        // Exibe estado resolvido com ícone e texto informativo
         val tituloResolvido = when (requisicao.tipo) {
           TipoRequisicao.ATIVIDADE_PARA_VENCER -> "Prazo Resolvido"
           TipoRequisicao.ATIVIDADE_VENCIDA -> "Vencimento Resolvido"
@@ -81,6 +115,7 @@ class RequisicaoAdapter(
         holder.itemView.setOnClickListener(null)
         holder.checkBox.visibility = View.GONE
       } else {
+        // Monta conteúdo da notificação automática com base no tipo
         val tipoInfo = when (requisicao.tipo) {
           TipoRequisicao.ATIVIDADE_PARA_VENCER -> Quadruple(
             "Prazo Próximo", R.drawable.ic_info, "#2196F3", "A atividade está próxima do prazo final."
@@ -114,6 +149,7 @@ class RequisicaoAdapter(
         holder.itemView.setOnClickListener(null)
       }
     } else {
+      // Notificação de requisição enviada por um usuário
       val titulo = when (requisicao.tipo) {
         TipoRequisicao.CRIAR_ATIVIDADE -> "Criação de Atividade"
         TipoRequisicao.EDITAR_ATIVIDADE -> "Edição de Atividade"
@@ -126,11 +162,13 @@ class RequisicaoAdapter(
       holder.textoTitulo.text = titulo
 
       if (modoCoordenador) {
+        // Coordenador visualiza pedidos pendentes
         holder.iconStatus.setImageResource(R.drawable.ic_help)
         holder.iconStatus.setColorFilter(Color.parseColor("#FFC107"))
         holder.textoMensagem.text = requisicao.mensagemResposta?.takeIf { it.isNotBlank() }
           ?: "Solicitação pendente de aprovação"
       } else {
+        // Apoio visualiza o status da própria requisição
         val (icone, cor) = when (requisicao.status) {
           StatusRequisicao.ACEITA -> R.drawable.ic_check_circle to "#4CAF50"
           StatusRequisicao.RECUSADA -> R.drawable.ic_cancel to "#F44336"
@@ -149,7 +187,7 @@ class RequisicaoAdapter(
       }
     }
 
-    // === Checkbox de seleção ===
+    // Animação e visibilidade da checkbox no modo seleção
     if (modoSelecao) {
       holder.checkBox.alpha = 0f
       holder.checkBox.visibility = View.VISIBLE
@@ -160,6 +198,7 @@ class RequisicaoAdapter(
       }.start()
     }
 
+    // Controle de seleção
     holder.checkBox.setOnCheckedChangeListener(null)
     holder.checkBox.isChecked = selecionadas.contains(requisicao)
 
@@ -172,7 +211,7 @@ class RequisicaoAdapter(
       onSelecaoMudou?.invoke()
     }
 
-    // === Clique no item ===
+    // Clique normal no item
     holder.itemView.setOnClickListener {
       if (modoSelecao) {
         val novoEstado = !holder.checkBox.isChecked
@@ -182,7 +221,7 @@ class RequisicaoAdapter(
       }
     }
 
-    // === Animação de entrada com alpha ajustado ===
+    // Suavização da entrada com animação e opacidade condicional
     holder.itemView.translationY = 20f
     val targetAlpha = if (isNotificacaoAutomatica && requisicao.resolvida) 0.6f else 1f
     holder.itemView.animate()
@@ -193,6 +232,9 @@ class RequisicaoAdapter(
   }
 
   companion object {
+    /**
+     * Callback usado pelo ListAdapter para calcular atualizações eficientes na lista.
+     */
     val DIFF_CALLBACK = object : DiffUtil.ItemCallback<RequisicaoEntity>() {
       override fun areItemsTheSame(oldItem: RequisicaoEntity, newItem: RequisicaoEntity): Boolean {
         return oldItem.id == newItem.id

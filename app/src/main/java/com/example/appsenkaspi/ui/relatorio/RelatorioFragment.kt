@@ -42,6 +42,24 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Fragmento responsável pela geração, visualização e gerenciamento de relatórios do sistema.
+ *
+ * Funcionalidades:
+ * - Geração de relatórios em PDF, Word (DOCX) ou Excel (XLSX), com base em dados dos Pilares, Ações e Atividades
+ * - Suporte a relatórios gerais (todos os pilares) ou específicos por pilar
+ * - Integração com a API externa para geração e download dos arquivos
+ * - Armazenamento local do histórico de relatórios por usuário
+ * - Exibição animada do histórico em lista, com divisão por tipo e data
+ *
+ * Integra os seguintes ViewModels:
+ * - [PilarViewModel]: acesso aos dados dos pilares
+ * - [FuncionarioViewModel]: identificação do usuário logado
+ * - [NotificacaoViewModel]: exibição de badges de notificação
+ *
+ * Utiliza [RelatorioAdapter] para exibir o histórico salvo.
+ */
+
 class RelatorioFragment : Fragment() {
 
     private var _binding: FragmentRelatorioBinding? = null
@@ -121,6 +139,9 @@ class RelatorioFragment : Fragment() {
         binding.textSelecionarPilar.alpha = 0f
         binding.layoutSpinnerPilares.alpha = 0f
     }
+  /**
+   * Inicializa o spinner de seleção de tipo de arquivo e oculta temporariamente o spinner de pilares.
+   */
 
     private fun configurarSpinners() {
         val tipoArquivoAdapter = ArrayAdapter.createFromResource(
@@ -133,8 +154,13 @@ class RelatorioFragment : Fragment() {
         binding.textSelecionarPilar.visibility = View.GONE
         binding.layoutSpinnerPilares.visibility = View.GONE
     }
+  /**
+   * Define os comportamentos dos botões de seleção (geral vs. por pilar), geração de relatório e limpeza de histórico.
+   * Inclui animações de seleção e alternância de visibilidade.
+   */
 
-    private fun configurarBotoes() {
+
+  private fun configurarBotoes() {
         updateButtonSelection(binding.btnRelatorioGeral, binding.btnRelatorioPorPilar)
 
         binding.btnRelatorioGeral.setOnClickListener {
@@ -180,12 +206,23 @@ class RelatorioFragment : Fragment() {
             }
         }
     }
+  /**
+   * Aplica uma transição suave ao layout raiz, usada para alternar visibilidade de elementos.
+   *
+   * @param root O ViewGroup onde a transição deve ser aplicada.
+   */
 
     private fun animateLayoutChange(root: ViewGroup) {
         val transition = AutoTransition()
         transition.duration = 300
         TransitionManager.beginDelayedTransition(root, transition)
     }
+  /**
+   * Atualiza a seleção visual entre dois botões (MaterialCardView), alterando cores com animação.
+   *
+   * @param selected O botão que foi selecionado.
+   * @param deselected O botão que foi desmarcado.
+   */
 
     private fun updateButtonSelection(selected: View, deselected: View) {
         selected.isSelected = true
@@ -204,6 +241,14 @@ class RelatorioFragment : Fragment() {
         animateBackgroundColor(deselected, fromColorDeselected, defaultColor)
     }
 
+  /**
+   * Anima a transição de cor de fundo de um [MaterialCardView] com interpolação suave.
+   *
+   * @param view O card a ser animado.
+   * @param fromColor Cor inicial.
+   * @param toColor Cor final.
+   */
+
     private fun animateBackgroundColor(view: View, fromColor: Int, toColor: Int) {
         val animator = ValueAnimator.ofObject(ArgbEvaluator(), fromColor, toColor)
         animator.duration = 300
@@ -213,7 +258,12 @@ class RelatorioFragment : Fragment() {
         }
         animator.start()
     }
-
+  /**
+   * Aplica uma leve animação de "clique" no botão com escala, e executa uma ação ao final.
+   *
+   * @param view O botão clicado.
+   * @param onEnd Ação a ser executada após a animação de retorno.
+   */
     private fun animateButtonClick(view: View, onEnd: (() -> Unit)? = null) {
         view.animate()
             .scaleX(0.95f)
@@ -229,7 +279,9 @@ class RelatorioFragment : Fragment() {
             }
             .start()
     }
-
+    /**
+   * Carrega todos os pilares do banco local e os insere no spinner de seleção.
+   */
     private fun carregarPilares() {
         lifecycleScope.launch {
             listaPilares = withContext(Dispatchers.IO) {
@@ -247,7 +299,11 @@ class RelatorioFragment : Fragment() {
             binding.spinnerPilares.setAdapter(pilarAdapter)
         }
     }
-
+  /**
+   * Gera o relatório no formato especificado, com base na seleção do usuário (geral ou por pilar).
+   *
+   * @param tipo Formato de arquivo desejado: "pdf", "docx" ou "xlsx"
+   */
     private fun gerarRelatorio(tipo: String) {
         lifecycleScope.launch {
             if (listaPilares.isEmpty()) {
@@ -397,6 +453,14 @@ class RelatorioFragment : Fragment() {
             }
         }
     }
+  /**
+   * Salva o [ResponseBody] do relatório no diretório de Downloads do dispositivo,
+   * com suporte a versões do Android ≥ Q.
+   *
+   * @param body Conteúdo binário do relatório retornado pela API
+   * @param nomeArquivo Nome final do arquivo a ser salvo
+   * @return Caminho como URI em string, ou null se falhar
+   */
 
     private fun salvarArquivo(body: ResponseBody?, nomeArquivo: String): String? {
         if (body == null) return null
@@ -457,6 +521,9 @@ class RelatorioFragment : Fragment() {
             null
         }
     }
+  /**
+   * Carrega o histórico de relatórios salvo para o usuário atual e exibe no RecyclerView.
+   */
 
     private fun carregarHistoricoSalvo() {
         if (nomeUsuarioLogado == null) return
@@ -467,6 +534,9 @@ class RelatorioFragment : Fragment() {
             binding.recyclerHistorico.visibility = View.VISIBLE
         }
     }
+  /**
+   * Exclui todos os relatórios do histórico local e atualiza a interface.
+   */
 
     private fun limparHistorico() {
         historicoRelatorios.clear()
@@ -477,6 +547,9 @@ class RelatorioFragment : Fragment() {
         }
         Toast.makeText(requireContext(), "Histórico limpo com sucesso", Toast.LENGTH_SHORT).show()
     }
+  /**
+   * Mostra um diálogo de confirmação antes de limpar o histórico de relatórios.
+   */
 
     private fun mostrarDialogConfirmacaoLimpeza() {
         val dialog = AlertDialog.Builder(requireContext())
@@ -498,7 +571,9 @@ class RelatorioFragment : Fragment() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.RED)
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.WHITE)
     }
-
+    /**
+   * Desfaz o binding para evitar memory leaks.
+   */
     override fun onDestroyView() {
         _binding = null
         super.onDestroyView()

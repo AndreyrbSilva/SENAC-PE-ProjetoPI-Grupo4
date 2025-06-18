@@ -12,19 +12,43 @@ import com.example.appsenkaspi.ui.notificacao.NotificacaoFragment
 import com.example.appsenkaspi.viewmodel.NotificacaoViewModel
 import com.example.appsenkaspi.R
 
+/**
+ * Configura o comportamento do botão de voltar em um `Fragment`.
+ *
+ * Este método deve ser chamado no `onViewCreated()` de um fragmento,
+ * e assume que existe um `ImageView` com o ID `IconVoltar` na hierarquia de `view`.
+ *
+ * @receiver Fragment onde o botão está inserido.
+ * @param view A raiz da view inflada no fragmento.
+ */
 fun Fragment.configurarBotaoVoltar(view: View) {
-    val botao = view.findViewById<ImageView>(R.id.IconVoltar)
-    botao?.setOnClickListener {
-        parentFragmentManager.popBackStack()
-    }
+  val botao = view.findViewById<ImageView>(R.id.IconVoltar)
+  botao?.setOnClickListener {
+    parentFragmentManager.popBackStack()
+  }
 }
+
+/**
+ * Configura o ícone de notificações e o badge numérico visível na top bar do aplicativo.
+ *
+ * O comportamento varia de acordo com o cargo:
+ * - Coordenadores veem a soma de notificações de requisição pendente e de prazo (a vencer ou vencidas).
+ * - Apoio e outros cargos veem apenas o número de notificações ainda não vistas.
+ *
+ * @param rootView A view raiz onde o ícone e o badge estão localizados.
+ * @param lifecycleOwner Ciclo de vida associado ao fragmento ou atividade.
+ * @param fragmentManager Usado para substituir o fragmento atual pelo `NotificacaoFragment` ao clicar no ícone.
+ * @param funcionarioId ID do funcionário autenticado.
+ * @param cargo Cargo do funcionário (COORDENADOR, APOIO, etc.).
+ * @param viewModel ViewModel usado para acessar notificações pendentes e não vistas.
+ */
 fun configurarNotificacaoBadge(
-    rootView: View,
-    lifecycleOwner: LifecycleOwner,
-    fragmentManager: FragmentManager,
-    funcionarioId: Int,
-    cargo: Cargo,
-    viewModel: NotificacaoViewModel
+  rootView: View,
+  lifecycleOwner: LifecycleOwner,
+  fragmentManager: FragmentManager,
+  funcionarioId: Int,
+  cargo: Cargo,
+  viewModel: NotificacaoViewModel
 ) {
   val badgeView = rootView.findViewById<TextView>(R.id.notificationBadge)
   val notificationIcon = rootView.findViewById<ImageView>(R.id.notificationIcon)
@@ -52,10 +76,10 @@ fun configurarNotificacaoBadge(
   notificationIcon?.setOnClickListener {
     fragmentManager.beginTransaction()
       .setCustomAnimations(
-        R.anim.pull_fade_in,     // animação de entrada
-        R.anim.pull_fade_out,    // animação de saída
-        R.anim.pull_fade_in,     // animação de retorno ao voltar
-        R.anim.pull_fade_out     // animação de saída ao voltar
+        R.anim.pull_fade_in,
+        R.anim.pull_fade_out,
+        R.anim.pull_fade_in,
+        R.anim.pull_fade_out
       )
       .replace(R.id.main_container, NotificacaoFragment())
       .addToBackStack(null)

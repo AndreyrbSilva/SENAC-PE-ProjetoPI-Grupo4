@@ -28,19 +28,34 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
+/**
+ * Fragmento responsável por editar ou deletar um Subpilar existente.
+ *
+ * Permite atualizar o nome, descrição e prazo do subpilar, com validação
+ * para garantir que a nova data não ultrapasse o prazo do Pilar pai.
+ *
+ * Também oferece opção de exclusão segura, com confirmação por diálogo.
+ */
 class EditarSubpilarFragment : Fragment() {
 
   private var _binding: FragmentEditarSubpilarBinding? = null
   private val binding get() = _binding!!
 
+  /** ViewModel que manipula dados de subpilares. */
   private val subpilarViewModel: SubpilarViewModel by activityViewModels()
+
+  /** ViewModel usado para obter o prazo máximo permitido pelo Pilar. */
   private val pilarViewModel: PilarViewModel by activityViewModels()
+
+  /** ViewModel que provê os dados do usuário logado, para exibir notificações. */
+  private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
+
+  /** ViewModel que alimenta o badge de notificações. */
+  private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
+
   private var subpilarId: Int = -1
   private var pilarId: Int = -1
   private var novaDataSelecionada: Date? = null
-
-  private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
-  private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
 
   override fun onCreateView(
     inflater: LayoutInflater, container: ViewGroup?,
@@ -56,14 +71,14 @@ class EditarSubpilarFragment : Fragment() {
 
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       funcionario?.let {
-          configurarNotificacaoBadge(
-              rootView = view,
-              lifecycleOwner = viewLifecycleOwner,
-              fragmentManager = parentFragmentManager,
-              funcionarioId = it.id,
-              cargo = it.cargo,
-              viewModel = notificacaoViewModel
-          )
+        configurarNotificacaoBadge(
+          rootView = view,
+          lifecycleOwner = viewLifecycleOwner,
+          fragmentManager = parentFragmentManager,
+          funcionarioId = it.id,
+          cargo = it.cargo,
+          viewModel = notificacaoViewModel
+        )
       }
     }
 
@@ -75,6 +90,7 @@ class EditarSubpilarFragment : Fragment() {
     }
 
     carregarDadosSubpilar(subpilarId)
+
     binding.buttonPickDateEdicao.setOnClickListener { abrirDatePicker() }
     binding.confirmarButtonWrapperEdicao.setOnClickListener {
       lifecycleScope.launch {
@@ -86,6 +102,11 @@ class EditarSubpilarFragment : Fragment() {
     binding.iconeMenuEdicao.setOnClickListener { exibirPopupMenu(it) }
   }
 
+  /**
+   * Busca no banco os dados do subpilar e preenche os campos da interface.
+   *
+   * @param id ID do subpilar a ser carregado.
+   */
   private fun carregarDadosSubpilar(id: Int) {
     lifecycleScope.launch {
       val dao = AppDatabase.getDatabase(requireContext()).subpilarDao()
@@ -95,6 +116,7 @@ class EditarSubpilarFragment : Fragment() {
         binding.inputDescricaoEdicao.setText(subpilar.descricao)
         novaDataSelecionada = subpilar.dataPrazo
         pilarId = subpilar.pilarId
+
         novaDataSelecionada?.let {
           val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
           binding.buttonPickDateEdicao.text = formato.format(it)
@@ -103,6 +125,9 @@ class EditarSubpilarFragment : Fragment() {
     }
   }
 
+  /**
+   * Exibe o seletor de data (DatePicker) para atualização do prazo.
+   */
   private fun abrirDatePicker() {
     val calendario = Calendar.getInstance()
     val datePicker = DatePickerDialog(
@@ -120,6 +145,11 @@ class EditarSubpilarFragment : Fragment() {
     datePicker.show()
   }
 
+  /**
+   * Verifica se a nova data do subpilar está dentro do prazo máximo permitido pelo Pilar pai.
+   *
+   * @return true se a data for válida; false caso contrário, com mensagens de erro apropriadas.
+   */
   private suspend fun validarPrazoComPilar(): Boolean {
     if (novaDataSelecionada == null) {
       binding.buttonPickDateEdicao.error = "Escolha um prazo"
@@ -153,6 +183,9 @@ class EditarSubpilarFragment : Fragment() {
     return true
   }
 
+  /**
+   * Remove hora/minuto/segundo de uma data para comparação apenas por dia.
+   */
   private fun truncarData(data: Date): Date {
     return Calendar.getInstance().apply {
       time = data
@@ -163,6 +196,10 @@ class EditarSubpilarFragment : Fragment() {
     }.time
   }
 
+  /**
+   * Realiza a atualização do subpilar no banco após validação dos campos.
+   * Persiste alterações e volta para a tela anterior.
+   */
   private fun confirmarEdicao() {
     val novoNome = binding.inputNomeEdicao.text.toString().trim()
     val novaDescricao = binding.inputDescricaoEdicao.text.toString().trim()
@@ -188,6 +225,9 @@ class EditarSubpilarFragment : Fragment() {
     }
   }
 
+  /**
+   * Remove permanentemente o subpilar selecionado do banco de dados.
+   */
   private fun deletarSubpilar() {
     lifecycleScope.launch {
       val dao = AppDatabase.getDatabase(requireContext()).subpilarDao()
@@ -202,6 +242,9 @@ class EditarSubpilarFragment : Fragment() {
     }
   }
 
+  /**
+   * Exibe diálogo de confirmação para excluir o subpilar de forma segura.
+   */
   private fun exibirDialogoConfirmacao() {
     val dialog = AlertDialog.Builder(requireContext())
       .setTitle("Confirmar exclusão")
@@ -224,6 +267,11 @@ class EditarSubpilarFragment : Fragment() {
   }
 
 
+  /**
+   * Exibe menu suspenso com ações extras (como deletar).
+   *
+   * @param anchor View usada como âncora para o popup.
+   */
   private fun exibirPopupMenu(anchor: View) {
     val popup = PopupMenu(requireContext(), anchor)
     popup.menuInflater.inflate(R.menu.menu_pilar, popup.menu)

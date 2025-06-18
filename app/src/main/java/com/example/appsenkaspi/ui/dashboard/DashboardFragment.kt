@@ -32,19 +32,41 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Fragmento responsável por exibir o painel geral de progresso de pilares, ações e atividades.
+ * Inclui gráfico de pizza (donut) com progresso agregado e gráfico de barras para comparação detalhada.
+ * Permite filtragem por Pilar através de um Spinner.
+ */
+
+
 class DashboardFragment : Fragment() {
+  /** Binding da View associada ao Fragmento */
 
   private var _binding: FragmentDashboardBinding? = null
   private val binding get() = _binding!!
 
+  /** ViewModel para operações com ações */
+
   private val acaoViewModel: AcaoViewModel by viewModels()
+
+  /** ViewModel para operações com pilares */
+
   private val pilarViewModel: PilarViewModel by viewModels()
 
-  // Usar activityViewModels para compartilhar com outros fragments
+  /** ViewModel compartilhado para dados do funcionário logado */
+
   private val funcionarioViewModel: FuncionarioViewModel by activityViewModels()
+
+  /** ViewModel compartilhado para gerenciar notificações */
+
   private val notificacaoViewModel: NotificacaoViewModel by activityViewModels()
 
+  /** Mapeamento entre nomes exibidos no Spinner e os IDs dos pilares */
+
   private val mapaNomesParaIds = mutableMapOf<String, Int?>()
+
+  /** ID do funcionário logado */
+
   private var funcionarioLogadoId: Int = -1
 
   override fun onCreateView(
@@ -58,7 +80,7 @@ class DashboardFragment : Fragment() {
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)
 
-    // Observar funcionário logado para configurar notificação e badges
+    // Observa o funcionário logado para configurar badges de notificação
     funcionarioViewModel.funcionarioLogado.observe(viewLifecycleOwner) { funcionario ->
       funcionario?.let {
         funcionarioLogadoId = it.id
@@ -81,6 +103,9 @@ class DashboardFragment : Fragment() {
     configurarSpinner()
   }
 
+  /**
+   * Configura o spinner de seleção de Pilar e vincula ações aos eventos de seleção.
+   */
   private fun configurarSpinner() {
     pilarViewModel.listarIdsENomes().observe(viewLifecycleOwner) { pilares ->
       val nomes = pilares.map { it.nome }
@@ -106,7 +131,10 @@ class DashboardFragment : Fragment() {
       override fun onNothingSelected(parent: AdapterView<*>) {}
     }
   }
-
+  /**
+   * Carrega os dados agregados de atividades e progresso para um pilar específico ou para todos (visão geral).
+   * @param pilarId ID do Pilar ou `null` para visão geral.
+   */
   private fun carregarResumo(pilarId: Int?) {
     lifecycleScope.launch {
       if (pilarId == null) {
@@ -196,7 +224,12 @@ class DashboardFragment : Fragment() {
 
 
 
-
+  /**
+   * Atualiza os valores do resumo de atividades e configura o gráfico de pizza com o progresso.
+   * @param resumo Dados agregados das atividades
+   * @param titulo Título descritivo do gráfico
+   * @param progressoReal Valor do progresso [0,1] opcional para sobrescrever o cálculo padrão
+   */
   private fun atualizarResumoEDonut(
       resumo: ResumoDashboard,
       titulo: String,
@@ -217,7 +250,10 @@ class DashboardFragment : Fragment() {
     // Agora o donut usará o progressoReal se disponível
     atualizarDonutChart(progressoUsado)
   }
-
+  /**
+   * Atualiza o gráfico de pizza (donut chart) com o progresso percentual.
+   * @param progresso Valor entre 0 e 1 representando a fração concluída
+   */
   private fun atualizarDonutChart(progresso: Float) {
     val progressoPercentual = (progresso * 100f).coerceIn(0f, 100f)
     val restante = 100f - progressoPercentual
@@ -258,8 +294,10 @@ class DashboardFragment : Fragment() {
   }
 
 
-
-
+  /**
+   * Decide qual versão do gráfico de barras carregar com base na presença de subpilares.
+   * @param pilarId ID do pilar ou `null` para visão geral
+   */
 
   private fun carregarGraficoDeBarras(pilarId: Int?) {
     if (pilarId == null) {
@@ -281,7 +319,9 @@ class DashboardFragment : Fragment() {
     }
   }
 
-
+  /**
+   * Carrega o gráfico de barras com o progresso de cada pilar (modo visão geral).
+   */
   private fun carregarGraficoDeBarrasVisaoGeral() {
     lifecycleScope.launch {
       withContext(Dispatchers.Main) {
@@ -358,7 +398,10 @@ class DashboardFragment : Fragment() {
     }
   }
 
-
+  /**
+   * Carrega o gráfico de barras com o progresso de cada ação dentro do pilar.
+   * @param pilarId ID do pilar sem subpilares
+   */
   private fun carregarGraficoDeBarrasPorAcoes(pilarId: Int) {
     lifecycleScope.launch {
       binding.labelBarChart.text = "Progresso de Cada Ação"
@@ -428,6 +471,10 @@ class DashboardFragment : Fragment() {
       }
     }
   }
+  /**
+   * Carrega o gráfico de barras com o progresso de cada subpilar dentro do pilar.
+   * @param pilarId ID do pilar com subpilares
+   */
 
   private fun carregarGraficoDeBarrasPorSubpilares(pilarId: Int) {
     lifecycleScope.launch {

@@ -22,273 +22,220 @@ import java.time.LocalDate
 import java.util.Calendar
 import java.util.Date
 
+/**
+ * ViewModel responsável pela lógica de controle dos pilares no sistema.
+ *
+ * Gerencia ações de criação, atualização, exclusão lógica e conclusão de pilares,
+ * cálculo de progresso (direto e por subpilares), atualização automática de status,
+ * e geração de resumos para dashboards.
+ *
+ * Utiliza DAOs do Room, corrotinas e LiveData para manter reatividade e consistência nos dados.
+ */
 class PilarViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val pilarDao = AppDatabase.Companion.getDatabase(application).pilarDao()
-    private val acaoDao = AppDatabase.Companion.getDatabase(application).acaoDao()
-    private val subpilarDao = AppDatabase.Companion.getDatabase(application).subpilarDao()
-    val statusAtivos = listOf(StatusPilar.EM_ANDAMENTO, StatusPilar.PLANEJADO)
+  private val pilarDao = AppDatabase.getDatabase(application).pilarDao()
+  private val acaoDao = AppDatabase.getDatabase(application).acaoDao()
+  private val subpilarDao = AppDatabase.getDatabase(application).subpilarDao()
+
+  val statusAtivos = listOf(StatusPilar.EM_ANDAMENTO, StatusPilar.PLANEJADO)
   val statusHistorico = listOf(StatusPilar.CONCLUIDO, StatusPilar.VENCIDO, StatusPilar.EXCLUIDO)
-  val statusParaDashboard = listOf(
-    StatusPilar.PLANEJADO,
-    StatusPilar.EM_ANDAMENTO,
-    StatusPilar.CONCLUIDO
-  )
+  val statusParaDashboard = listOf(StatusPilar.PLANEJADO, StatusPilar.EM_ANDAMENTO, StatusPilar.CONCLUIDO)
 
-
+  /** Retorna um pilar pelo ID (modo reativo). */
   fun getPilarById(id: Int): LiveData<PilarEntity?> = pilarDao.getPilarById(id)
 
-    fun listarTodosPilares(): LiveData<List<PilarEntity>> = pilarDao.listarTodosPilares()
+  /** Lista todos os pilares (modo reativo). */
+  fun listarTodosPilares(): LiveData<List<PilarEntity>> = pilarDao.listarTodosPilares()
 
-    fun inserir(pilar: PilarEntity) = viewModelScope.launch {
-        pilarDao.inserirPilar(pilar)
-    }
+  /** Insere um novo pilar no banco. */
+  fun inserir(pilar: PilarEntity) = viewModelScope.launch {
+    pilarDao.inserirPilar(pilar)
+  }
 
-    fun atualizar(pilar: PilarEntity) = viewModelScope.launch {
-        pilarDao.atualizarPilar(pilar)
-    }
+  /** Atualiza os dados de um pilar. */
+  fun atualizar(pilar: PilarEntity) = viewModelScope.launch {
+    pilarDao.atualizarPilar(pilar)
+  }
 
-    fun deletar(pilar: PilarEntity) = viewModelScope.launch {
-        pilarDao.deletarPilar(pilar)
-    }
+  /** Remove um pilar definitivamente do banco. */
+  fun deletar(pilar: PilarEntity) = viewModelScope.launch {
+    pilarDao.deletarPilar(pilar)
+  }
 
+  /**
+   * Marca um pilar como excluído, alterando seu status e data de exclusão.
+   */
   fun excluirPilar(pilar: PilarEntity) = viewModelScope.launch(Dispatchers.IO) {
     val hoje = Calendar.getInstance().time
-    Log.d("ExcluirPilar", "Enviando para DAO → id=${pilar.id}, status=${StatusPilar.EXCLUIDO.name}, data=$hoje")
-
-
     val linhasAfetadas = pilarDao.excluirPilarPorId(pilar.id, StatusPilar.EXCLUIDO, hoje)
-
     Log.d("ExcluirPilar", "Linhas afetadas: $linhasAfetadas")
-
   }
 
-
-
-
+  /** Insere um pilar e retorna o ID gerado. */
   suspend fun inserirRetornandoId(pilar: PilarEntity): Long = pilarDao.inserirPilar(pilar)
 
-    fun calcularProgressoDoPilar(pilarId: Int, callback: (Float) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val progresso = calcularProgressoInterno(pilarId)
-            withContext(Dispatchers.Main) {
-                callback(progresso)
-            }
-        }
+  /**
+   * Calcula o progresso de um pilar (ações ou subpilares) e envia via callback.
+   */
+  fun calcularProgressoDoPilar(pilarId: Int, callback: (Float) -> Unit) {
+    viewModelScope.launch(Dispatchers.IO) {
+      val progresso = calcularProgressoInterno(pilarId)
+      withContext(Dispatchers.Main) { callback(progresso) }
     }
-    suspend fun temSubpilares(pilarId: Int): Boolean {
-      return subpilarDao.contarSubpilaresDoPilar(pilarId) > 0
-    }
-
-  suspend fun temSubpilaresDireto(pilarId: Int): Boolean {
-    return AppDatabase.Companion.getDatabase(getApplication()).subpilarDao().getQuantidadePorPilar(pilarId) > 0
   }
 
+  /** Verifica se o pilar possui subpilares (modo suspend). */
+  suspend fun temSubpilares(pilarId: Int): Boolean =
+    subpilarDao.contarSubpilaresDoPilar(pilarId) > 0
 
+  /** Alternativa direta para verificar existência de subpilares. */
+  suspend fun temSubpilaresDireto(pilarId: Int): Boolean =
+    subpilarDao.getQuantidadePorPilar(pilarId) > 0
 
-  // Função suspensa reutilizável
-    suspend fun calcularProgressoInterno(pilarId: Int): Float = coroutineScope {
-      val subpilares = subpilarDao.listarSubpilaresPorTelaPilar(pilarId)
+  /**
+   * Calcula o progresso interno de um pilar:
+   * - Se houver subpilares, calcula média do progresso deles.
+   * - Se não, usa as ações diretamente.
+   */
+  suspend fun calcularProgressoInterno(pilarId: Int): Float = coroutineScope {
+    val subpilares = subpilarDao.listarSubpilaresPorTelaPilar(pilarId)
 
-      if (subpilares.isNotEmpty()) {
-          val subProgressoList = subpilares.map { subpilar ->
-              async {
-                  ProgressoSubpilar.calcularProgressoDoSubpilarInterno(subpilar.id, acaoDao)
-              }
-          }.awaitAll()
-
-          subProgressoList.average().toFloat()
-      } else {
-          val lista = acaoDao.listarProgressoPorPilar(pilarId)
-          val (somaPesos, somaTotalAtividades) = lista.fold(0f to 0) { acc, item ->
-              val pesoAtual = item.progresso * item.totalAtividades
-              (acc.first + pesoAtual) to (acc.second + item.totalAtividades)
-          }
-          if (somaTotalAtividades > 0) somaPesos / somaTotalAtividades else 0f
+    if (subpilares.isNotEmpty()) {
+      val subProgressoList = subpilares.map { sub ->
+        async { ProgressoSubpilar.calcularProgressoDoSubpilarInterno(sub.id, acaoDao) }
+      }.awaitAll()
+      subProgressoList.average().toFloat()
+    } else {
+      val lista = acaoDao.listarProgressoPorPilar(pilarId)
+      val (somaPesos, somaTotal) = lista.fold(0f to 0) { acc, item ->
+        val peso = item.progresso * item.totalAtividades
+        (acc.first + peso) to (acc.second + item.totalAtividades)
       }
+      if (somaTotal > 0) somaPesos / somaTotal else 0f
+    }
   }
+
+  /**
+   * Atualiza automaticamente o status de um pilar com base em seu progresso e prazo.
+   */
   suspend fun atualizarStatusAutomaticamente(pilarId: Int) {
     val pilar = pilarDao.getById(pilarId) ?: return
     val progresso = calcularProgressoInterno(pilarId)
     val hoje = Calendar.getInstance().time
 
     if (pilar.status == StatusPilar.EXCLUIDO) return
-    if (pilar.status == StatusPilar.CONCLUIDO && progresso >= 1f) {
-      Log.d("StatusAuto", "Mantendo CONCLUIDO pois foi definido manualmente.")
-      return
-    }
+    if (pilar.status == StatusPilar.CONCLUIDO && progresso >= 1f) return
 
     val passouPrazo = hoje.after(pilar.dataPrazo)
 
     val novoStatus = when {
-      // 🔁 Se era VENCIDO e prazo foi prorrogado → vai para EM_ANDAMENTO
       pilar.status == StatusPilar.VENCIDO && !passouPrazo -> StatusPilar.EM_ANDAMENTO
-
-      // ✅ Só conclui automaticamente se passou do prazo E progresso 100%
       progresso >= 1f && passouPrazo -> StatusPilar.CONCLUIDO
-
-      // 🔄 Continua vencido se passou o prazo e não está concluído
       progresso < 1f && passouPrazo -> StatusPilar.VENCIDO
-
-      // 🔁 Estava CONCLUIDO mas progresso caiu
       progresso < 1f && pilar.status == StatusPilar.CONCLUIDO -> StatusPilar.EM_ANDAMENTO
-
       progresso == 0f -> StatusPilar.PLANEJADO
-
       else -> StatusPilar.EM_ANDAMENTO
     }
 
     if (novoStatus != pilar.status) {
-      val novoPilar = if (novoStatus == StatusPilar.CONCLUIDO) {
+      val atualizado = if (novoStatus == StatusPilar.CONCLUIDO) {
         pilar.copy(status = novoStatus, dataConclusao = hoje)
       } else {
         pilar.copy(status = novoStatus)
       }
-      pilarDao.atualizarPilar(novoPilar)
-      Log.d("StatusAuto", "Status atualizado: ${pilar.status} → $novoStatus")
+      pilarDao.atualizarPilar(atualizado)
     }
   }
 
+  /** Retorna a data de prazo de um pilar pelo ID. */
+  suspend fun getDataPrazoDoPilar(id: Int): Date? = pilarDao.getById(id).dataPrazo
 
-
-
-
-
-  suspend fun getDataPrazoDoPilar(id: Int): Date? {
-    return pilarDao.getById(id).dataPrazo
-  }
-
-
+  /** Atualiza o status de todos os pilares no banco. */
   fun atualizarStatusDeTodosOsPilares() = viewModelScope.launch(Dispatchers.IO) {
-    val todosPilares = pilarDao.getTodosPilares()
-    todosPilares.forEach { pilar ->
-      atualizarStatusAutomaticamente(pilar.id)
-    }
+    pilarDao.getTodosPilares().forEach { atualizarStatusAutomaticamente(it.id) }
   }
 
+  /**
+   * Verifica se o pilar pode ser concluído com base no progresso e na data de vencimento.
+   */
   suspend fun podeConcluirPilar(pilarId: Int, dataVencimento: LocalDate): Boolean {
     val progresso = calcularProgressoInterno(pilarId)
     val hoje = LocalDate.now()
-
-    return progresso >= 1f && (hoje.isBefore(dataVencimento) || hoje.isEqual(dataVencimento))
+    return progresso >= 1f && (hoje <= dataVencimento)
   }
 
+  /** Marca um pilar como concluído com data atual. */
   fun concluirPilar(pilarId: Int) = viewModelScope.launch(Dispatchers.IO) {
     val hoje = Calendar.getInstance().time
-
-    Log.d("ConcluirPilar", "Atualizando status para CONCLUIDO com dataConclusao = $hoje para pilarId=$pilarId")
-
-    val linhasAfetadas = pilarDao.atualizarStatusEDataConclusao(
-      pilarId,
-      StatusPilar.CONCLUIDO, // ✅ enum diretamente, sem .name nem .lowercase()
-      hoje
-    )
-
-    Log.d("ConcluirPilar", "Linhas afetadas na atualização: $linhasAfetadas")
+    pilarDao.atualizarStatusEDataConclusao(pilarId, StatusPilar.CONCLUIDO, hoje)
   }
 
-
-
-
-
-
-
+  /** Lista os pilares ativos (em andamento ou planejados). */
   fun listarPilaresAtivos() = pilarDao.listarPilaresPorStatus(statusAtivos)
+
+  /** Lista os pilares concluídos, vencidos ou excluídos. */
   fun listarPilaresHistorico() = pilarDao.listarPilaresPorStatus(statusHistorico)
 
-  fun listarIdsENomes(): LiveData<List<PilarNomeDTO>> {
-    return AppDatabase.Companion.getDatabase(getApplication()).pilarDao().listarIdsENomesPorStatus(statusParaDashboard)
-  }
+  /** Lista IDs e nomes de pilares para dashboards. */
+  fun listarIdsENomes(): LiveData<List<PilarNomeDTO>> =
+    pilarDao.listarIdsENomesPorStatus(statusParaDashboard)
 
-  fun listarAcaoIdsENomes(): LiveData<List<PilarNomeDTO>> {
-    return AppDatabase.Companion.getDatabase(getApplication()).pilarDao().listarIdsENomesPorStatus(statusParaDashboard)
-  }
+  fun listarAcaoIdsENomes(): LiveData<List<PilarNomeDTO>> =
+    pilarDao.listarIdsENomesPorStatus(statusParaDashboard)
 
-  suspend fun getPilaresParaDashboard(): List<PilarEntity> {
-    return pilarDao.getPilaresPorStatus(statusParaDashboard)
-  }
+  /** Retorna pilares com status relevantes para dashboard. */
+  suspend fun getPilaresParaDashboard(): List<PilarEntity> =
+    pilarDao.getPilaresPorStatus(statusParaDashboard)
 
+  /** Retorna todos os pilares no banco (modo suspend). */
   suspend fun getTodosPilares(): List<PilarEntity> = withContext(Dispatchers.IO) {
-      pilarDao.getTodosPilares()
+    pilarDao.getTodosPilares()
   }
 
-    fun listarPilaresPorStatusEData(
-        status: StatusPilar,
-        dataExclusao: String? = null
-    ): LiveData<List<PilarEntity>> {
-        return if (dataExclusao.isNullOrEmpty()) {
-            pilarDao.listarPilaresPorStatus(status)
-        } else {
-            pilarDao.listarPilaresPorStatusEData(status, dataExclusao)
-        }
+  /** Lista pilares por status e opcionalmente por data de exclusão. */
+  fun listarPilaresPorStatusEData(status: StatusPilar, dataExclusao: String? = null): LiveData<List<PilarEntity>> {
+    return if (dataExclusao.isNullOrEmpty()) {
+      pilarDao.listarPilaresPorStatus(status)
+    } else {
+      pilarDao.listarPilaresPorStatusEData(status, dataExclusao)
     }
+  }
+
+  /**
+   * Calcula o progresso individual de cada subpilar (nome e percentual).
+   */
   suspend fun calcularProgressoDosSubpilares(pilarId: Int): List<Pair<String, Float>> {
-    val subpilares = AppDatabase.Companion.getDatabase(getApplication()).subpilarDao().listarPorPilar(pilarId)
-    val acaoDao = AppDatabase.Companion.getDatabase(getApplication()).acaoDao()
-    val atividadeDao = AppDatabase.Companion.getDatabase(getApplication()).atividadeDao()
+    val subpilares = subpilarDao.listarPorPilar(pilarId)
+    val acaoDao = AppDatabase.getDatabase(getApplication()).acaoDao()
+    val atividadeDao = AppDatabase.getDatabase(getApplication()).atividadeDao()
 
-    val resultado = mutableListOf<Pair<String, Float>>()
-
-    for (subpilar in subpilares) {
-      val acoes = acaoDao.listarPorSubpilares(subpilar.id)
-      val atividades = acoes.flatMap { acao ->
-        acao.id?.let { atividadeDao.listarPorAcao(it) } ?: emptyList()
-      }
-
-
+    return subpilares.map { sub ->
+      val acoes = acaoDao.listarPorSubpilares(sub.id)
+      val atividades = acoes.flatMap { it.id?.let { id -> atividadeDao.listarPorAcao(id) } ?: emptyList() }
       val total = atividades.size
       val concluidas = atividades.count { it.status == StatusAtividade.CONCLUIDA }
-
       val progresso = if (total > 0) concluidas.toFloat() / total else 0f
-      resultado.add(subpilar.nome to progresso)
+      sub.nome to progresso
     }
-
-    return resultado
   }
+
+  /**
+   * Gera um resumo completo (ações + atividades) com callback para exibição no dashboard.
+   */
   fun gerarResumoPorSubpilares(pilarId: Int, callback: (ResumoDashboard) -> Unit) {
     viewModelScope.launch(Dispatchers.IO) {
-      val db = AppDatabase.Companion.getDatabase(getApplication())
-      val subpilares = db.subpilarDao().listarPorPilarDireto(pilarId)
-      val acaoDao = db.acaoDao()
-      val atividadeDao = db.atividadeDao()
-
-      var totalAcoes = 0
-      var totalAtividades = 0
-      var atividadesConcluidas = 0
-      var atividadesAndamento = 0
-      var atividadesAtraso = 0
-
-      for (sub in subpilares) {
-        val acoes = acaoDao.listarPorSubpilares(sub.id)
-          totalAcoes += acoes.size
-
-        for (acao in acoes) {
-          val atividades = acao.id?.let { atividadeDao.listarPorAcao(it) } ?: emptyList()
-          totalAtividades += atividades.size
-          atividadesConcluidas += atividades.count { it.status == StatusAtividade.CONCLUIDA }
-          atividadesAndamento += atividades.count { it.status == StatusAtividade.EM_ANDAMENTO }
-          atividadesAtraso += atividades.count { it.status == StatusAtividade.VENCIDA }
-        }
-      }
-
-      val resumo = ResumoDashboard(
-          totalAcoes = totalAcoes,
-          totalAtividades = totalAtividades,
-          atividadesConcluidas = atividadesConcluidas,
-          atividadesAndamento = atividadesAndamento,
-          atividadesAtraso = atividadesAtraso
-      )
-
-        withContext(Dispatchers.Main) {
-            callback(resumo)
-        }
+      val resumo = gerarResumoPorSubpilaresDireto(pilarId)
+      withContext(Dispatchers.Main) { callback(resumo) }
     }
   }
+
+  /**
+   * Gera um resumo completo de atividades a partir dos subpilares (modo direto).
+   */
   suspend fun gerarResumoPorSubpilaresDireto(pilarId: Int): ResumoDashboard {
-    val db = AppDatabase.Companion.getDatabase(getApplication())
-    val subpilares = db.subpilarDao().listarPorPilarDireto(pilarId)
-    val acaoDao = db.acaoDao()
-    val atividadeDao = db.atividadeDao()
+    val subpilares = subpilarDao.listarPorPilarDireto(pilarId)
+    val acaoDao = acaoDao
+    val atividadeDao = AppDatabase.getDatabase(getApplication()).atividadeDao()
 
     var totalAcoes = 0
     var totalAtividades = 0
@@ -310,15 +257,11 @@ class PilarViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     return ResumoDashboard(
-        totalAcoes,
-        totalAtividades,
-        atividadesConcluidas,
-        atividadesAndamento,
-        atividadesAtraso
+      totalAcoes,
+      totalAtividades,
+      atividadesConcluidas,
+      atividadesAndamento,
+      atividadesAtraso
     )
   }
-
-
-
-
 }

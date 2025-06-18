@@ -119,8 +119,7 @@ class EditarAtividadeFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
           val acao = AppDatabase.Companion.getDatabase(requireContext())
-            .acaoDao()
-            .getAcaoPorId(atividadeOriginal.acaoId)
+            .acaoDao().getAcaoPorIdDireto(atividadeOriginal.acaoId)
 
           if (acao != null) {
             dataPrazoAcao = acao.dataPrazo
